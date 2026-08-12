@@ -1,0 +1,1350 @@
+<title>Kalman Filter Bench</title>
+
+<style>
+  /* ---------- tokens: light is the base, both dark scopes redefine ---------- */
+  :root {
+    color-scheme: light;
+    --bg:        #f1f4f6;
+    --panel:     #fdfefe;
+    --inset:     #f5f8f9;
+    --ink:       #0f1417;
+    --ink-2:     #4d565e;
+    --muted:     #7f8993;
+    --rule:      #dde3e7;
+    --grid:      #e8edf0;
+    --ring:      rgba(15, 20, 23, 0.10);
+    --shadow:    0 1px 2px rgba(15, 20, 23, .05), 0 8px 24px -16px rgba(15, 20, 23, .28);
+
+    --est:       #2a78d6;   /* posterior / filter estimate */
+    --est-soft:  rgba(42, 120, 214, .16);
+    --est-wash:  rgba(42, 120, 214, .07);
+    --meas:      #eb6834;   /* measurement / likelihood  */
+    --meas-soft: rgba(235, 104, 52, .14);
+    --pred:      #1baf7a;   /* prediction / prior        */
+    --pred-soft: rgba(27, 175, 122, .14);
+    --truth:     #4d565e;   /* ground truth (reference)  */
+    --good:      #0ca30c;
+
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --math: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg:        #0d1012;
+      --panel:     #171b1f;
+      --inset:     #1d2328;
+      --ink:       #f3f6f8;
+      --ink-2:     #b4bec6;
+      --muted:     #7e8890;
+      --rule:      #2a3238;
+      --grid:      #222a30;
+      --ring:      rgba(255, 255, 255, 0.10);
+      --shadow:    0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -16px rgba(0, 0, 0, .9);
+      --est:       #3987e5;
+      --est-soft:  rgba(57, 135, 229, .20);
+      --est-wash:  rgba(57, 135, 229, .09);
+      --meas:      #d95926;
+      --meas-soft: rgba(217, 89, 38, .18);
+      --pred:      #199e70;
+      --pred-soft: rgba(25, 158, 112, .18);
+      --truth:     #b4bec6;
+      --good:      #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:        #0d1012;
+    --panel:     #171b1f;
+    --inset:     #1d2328;
+    --ink:       #f3f6f8;
+    --ink-2:     #b4bec6;
+    --muted:     #7e8890;
+    --rule:      #2a3238;
+    --grid:      #222a30;
+    --ring:      rgba(255, 255, 255, 0.10);
+    --shadow:    0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -16px rgba(0, 0, 0, .9);
+    --est:       #3987e5;
+    --est-soft:  rgba(57, 135, 229, .20);
+    --est-wash:  rgba(57, 135, 229, .09);
+    --meas:      #d95926;
+    --meas-soft: rgba(217, 89, 38, .18);
+    --pred:      #199e70;
+    --pred-soft: rgba(25, 158, 112, .18);
+    --truth:     #b4bec6;
+    --good:      #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* ---------- header ---------- */
+  header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(28px, 4.4vw, 40px);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .lede {
+    margin: 0;
+    max-width: 64ch;
+    color: var(--ink-2);
+    font-size: 16px;
+  }
+
+  /* ---------- panels ---------- */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--ring);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 16px 18px 14px;
+    min-width: 0;
+  }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  .panel-note { font-size: 13px; color: var(--ink-2); margin: 0; }
+
+  /* ---------- stat tiles ---------- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+  .tile { display: flex; flex-direction: column; gap: 2px; }
+  .tile .label {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .tile .value { font-size: 30px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+  .tile .value .unit { font-size: 15px; font-weight: 500; color: var(--ink-2); margin-left: 3px; }
+  .tile .sub { font-size: 12.5px; color: var(--muted); }
+  .tile.hero .value { color: var(--good); }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  .swatch.line { height: 3px; width: 14px; border-radius: 2px; }
+  .swatch.dot { border-radius: 50%; }
+
+  /* ---------- legend ---------- */
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+  .legend .item {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; color: var(--ink-2); white-space: nowrap;
+  }
+  .legend .band { width: 14px; height: 10px; border-radius: 2px; background: var(--est-soft); border: 1px solid var(--est); flex: none; }
+  .legend .dash {
+    width: 16px; height: 0; flex: none;
+    border-top: 2px dashed currentColor;
+  }
+
+  /* ---------- charts ---------- */
+  .chart { position: relative; width: 100%; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #track { height: 330px; cursor: crosshair; }
+  #fusion { height: 268px; }
+  #vel    { height: 268px; }
+  #sigma  { height: 168px; }
+  #gain   { height: 168px; }
+
+  .tooltip {
+    position: absolute; pointer-events: none; opacity: 0;
+    transition: opacity .12s ease;
+    background: var(--panel);
+    border: 1px solid var(--ring);
+    border-radius: 7px;
+    box-shadow: var(--shadow);
+    padding: 8px 10px;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    min-width: 158px;
+    z-index: 5;
+  }
+  .tooltip.on { opacity: 1; }
+  .tooltip .tt-t { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .tooltip .row { display: flex; align-items: center; gap: 7px; justify-content: space-between; }
+  .tooltip .row .k { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  .tooltip .row .v { font-weight: 600; }
+
+  /* ---------- controls ---------- */
+  .controls { display: flex; flex-direction: column; gap: 14px; }
+  .transport { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  button {
+    font-family: var(--sans); font-size: 13.5px; font-weight: 500;
+    color: var(--ink); background: var(--inset);
+    border: 1px solid var(--ring); border-radius: 7px;
+    padding: 7px 13px; cursor: pointer;
+    transition: background .12s ease, border-color .12s ease;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--est); border-color: var(--est); color: #fff; min-width: 92px; }
+  button.primary:hover { filter: brightness(1.06); }
+  :focus-visible { outline: 2px solid var(--est); outline-offset: 2px; }
+
+  .scrub-row { display: flex; align-items: center; gap: 14px; }
+  .step-read {
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-2);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; width: 100%; height: 20px; cursor: pointer; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--grid); }
+  input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--grid); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: var(--est); border: 2px solid var(--panel); margin-top: -5.5px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--panel); background: var(--est);
+  }
+
+  .knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 22px; }
+  .knob { display: flex; flex-direction: column; gap: 2px; }
+  .knob .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .knob label {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .11em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .knob .val { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .knob .hint { font-size: 12px; color: var(--muted); }
+  .toggles { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
+  .toggle input { accent-color: var(--est); width: 15px; height: 15px; cursor: pointer; }
+
+  /* ---------- narration ---------- */
+  .phase-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 999px; padding: 2px 9px;
+  }
+  .phase-chip.predict { color: var(--pred); }
+  .phase-chip.update  { color: var(--est); }
+  .phase-chip.idle    { color: var(--muted); }
+  .narrate { font-size: 13.5px; color: var(--ink-2); min-height: 42px; margin: 8px 0 0; }
+  .narrate b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- grids ---------- */
+  .row-2 { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 18px; }
+  .row-2b { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  @media (max-width: 860px) { .row-2 { grid-template-columns: minmax(0, 1fr); } }
+
+  /* ---------- equations ---------- */
+  .eqs { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 12px; }
+  .eq {
+    background: var(--inset); border: 1px solid transparent; border-radius: 8px;
+    padding: 11px 13px 12px; display: flex; flex-direction: column; gap: 7px;
+    transition: border-color .18s ease, background .18s ease;
+    min-width: 0; overflow-x: auto;
+  }
+  .eq.live-predict { border-color: var(--pred); background: var(--pred-soft); }
+  .eq.live-update  { border-color: var(--est);  background: var(--est-wash); }
+  .eq .cap {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .eq .form { font-family: var(--math); font-size: 17px; line-height: 1.35; white-space: nowrap; }
+  .eq .form i { font-style: italic; }
+  .eq .num {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .eq .num b { color: var(--ink); font-weight: 600; }
+
+  .mat-strip { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; }
+  .mat { display: flex; align-items: center; gap: 9px; }
+  .mat .name { font-family: var(--math); font-style: italic; font-size: 17px; }
+  .mat .grid-vals {
+    display: grid; gap: 2px 14px;
+    font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums;
+    padding: 3px 10px; border-left: 2px solid var(--rule); border-right: 2px solid var(--rule);
+    text-align: right;
+  }
+  .mat .cap-under { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+  /* ---------- table ---------- */
+  details.data { background: var(--panel); border: 1px solid var(--ring); border-radius: 10px; box-shadow: var(--shadow); padding: 0; }
+  details.data summary {
+    cursor: pointer; padding: 13px 18px; list-style: none;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+  }
+  details.data summary::-webkit-details-marker { display: none; }
+  details.data summary::after { content: " ▸"; }
+  details.data[open] summary::after { content: " ▾"; }
+  .table-scroll { max-height: 340px; overflow: auto; border-top: 1px solid var(--rule); }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 12px; text-align: right; white-space: nowrap; }
+  th {
+    position: sticky; top: 0; background: var(--panel);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--rule); z-index: 1;
+  }
+  td { color: var(--ink-2); border-bottom: 1px solid var(--grid); }
+  tr.cur td { background: var(--est-wash); color: var(--ink); }
+
+  footer { color: var(--muted); font-size: 12.5px; max-width: 72ch; }
+  footer code { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: .01ms !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Lab 65 · State estimation</div>
+    <h1>Kalman Filter Bench</h1>
+    <p class="lede">
+      A sensor reports the position of a moving target once every 150&nbsp;ms, through noise.
+      The filter recovers not just a cleaner position, but the velocity nobody ever measured —
+      by carrying an <em>uncertainty</em> alongside every estimate and letting it decide how much
+      each new reading is worth.
+    </p>
+  </header>
+
+  <div class="panel">
+    <div class="stats">
+      <div class="tile">
+        <div class="label"><span class="swatch dot" style="background: var(--meas)"></span>Sensor error</div>
+        <div class="value" id="stat-meas">—<span class="unit">m rms</span></div>
+        <div class="sub">raw readings vs. truth</div>
+      </div>
+      <div class="tile">
+        <div class="label"><span class="swatch line" style="background: var(--est)"></span>Filter error</div>
+        <div class="value" id="stat-filt">—<span class="unit">m rms</span></div>
+        <div class="sub">estimate vs. truth</div>
+      </div>
+      <div class="tile hero">
+        <div class="label">Error removed</div>
+        <div class="value" id="stat-gain">—<span class="unit">%</span></div>
+        <div class="sub">measured after settling, t&nbsp;&gt;&nbsp;1.5&nbsp;s</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">Position over time</h2>
+      <div class="legend">
+        <span class="item"><span class="swatch line" style="background: var(--truth)"></span>True position</span>
+        <span class="item"><span class="swatch dot" style="background: var(--meas)"></span>Measurement</span>
+        <span class="item"><span class="swatch line" style="background: var(--est)"></span>Filter estimate</span>
+        <span class="item"><span class="band"></span>±2σ (95% belief)</span>
+      </div>
+    </div>
+    <div class="chart">
+      <canvas id="track" aria-label="Position versus time: true trajectory, noisy measurements, and the filter estimate with its 95 percent uncertainty band. Full values are in the step-by-step data table below."></canvas>
+      <div class="tooltip" id="tt"></div>
+    </div>
+  </div>
+
+  <div class="panel controls">
+    <div class="scrub-row">
+      <input type="range" id="scrub" min="0" max="169" value="0" step="1" aria-label="Time step">
+      <span class="step-read" id="step-read">step 000 · t = 0.00 s</span>
+    </div>
+    <div class="transport">
+      <button class="primary" id="play">Play</button>
+      <button id="step">Step</button>
+      <button id="reset">Restart</button>
+      <button id="reseed">New noise</button>
+      <div class="toggles" style="margin-left: auto">
+        <label class="toggle"><input type="checkbox" id="dropout">Sensor dropout, 13–17&nbsp;s</label>
+      </div>
+    </div>
+    <div class="knobs">
+      <div class="knob">
+        <div class="top">
+          <label for="rnoise">Measurement noise σ<sub>R</sub></label>
+          <span class="val" id="rnoise-val">6.0 m</span>
+        </div>
+        <input type="range" id="rnoise" min="0.5" max="20" step="0.5" value="6">
+        <span class="hint">How badly the sensor lies. Raise it and the filter stops listening.</span>
+      </div>
+      <div class="knob">
+        <div class="top">
+          <label for="qnoise">Process noise σ<sub>a</sub></label>
+          <span class="val" id="qnoise-val">2.00 m/s²</span>
+        </div>
+        <input type="range" id="qnoise" min="0.05" max="6" step="0.05" value="2">
+        <span class="hint">How much the target is allowed to surprise the model. Raise it and the filter stops trusting itself.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row-2">
+    <div class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">One step, up close</h2>
+        <span class="phase-chip idle" id="phase-chip">Predict</span>
+      </div>
+      <div class="legend" style="margin-bottom: 6px">
+        <span class="item" style="color: var(--pred)"><span class="dash"></span><span style="color: var(--ink-2)">Prediction</span></span>
+        <span class="item" style="color: var(--meas)"><span class="dash"></span><span style="color: var(--ink-2)">Measurement</span></span>
+        <span class="item"><span class="swatch line" style="background: var(--est)"></span>New estimate</span>
+        <span class="item" style="color: var(--truth)"><span class="dash"></span><span style="color: var(--ink-2)">Truth</span></span>
+      </div>
+      <div class="chart">
+        <canvas id="fusion" aria-label="Probability density over position for the current step: the prediction, the measurement likelihood, and the resulting estimate."></canvas>
+      </div>
+      <p class="narrate" id="narrate"></p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Velocity — never measured</h2>
+        <div class="legend">
+          <span class="item"><span class="swatch line" style="background: var(--truth)"></span>True</span>
+          <span class="item"><span class="swatch line" style="background: var(--est)"></span>Estimated</span>
+        </div>
+      </div>
+      <div class="chart">
+        <canvas id="vel" aria-label="Velocity over time: true velocity against the filter's estimate and its 95 percent band, inferred from position readings alone."></canvas>
+      </div>
+      <p class="panel-note" style="margin-top: 8px">
+        The sensor only reports position. Velocity is recovered from the <em>correlation</em> P<sub>pv</sub>
+        the filter builds between the two — which is why the band starts enormous and tightens as evidence accrues.
+      </p>
+    </div>
+  </div>
+
+  <div class="row-2b">
+    <div class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Uncertainty σ<sub>p</sub></h2>
+        <div class="legend">
+          <span class="item"><span class="swatch line" style="background: var(--pred)"></span>After predict</span>
+          <span class="item"><span class="swatch line" style="background: var(--est)"></span>After update</span>
+        </div>
+      </div>
+      <div class="chart"><canvas id="sigma" aria-label="Position uncertainty over time, before and after each measurement update."></canvas></div>
+      <p class="panel-note" style="margin-top: 8px">Every prediction widens the belief; every measurement narrows it again. The two lines close on each other as the filter reaches steady state — the point where one reading's worth of information exactly offsets one step of drift. Switch on sensor dropout to tear the gap open.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Kalman gain K<sub>p</sub></h2>
+      </div>
+      <div class="chart"><canvas id="gain" aria-label="Kalman gain for position over time, between 0 and 1."></canvas></div>
+      <p class="panel-note" style="margin-top: 8px"><b>0</b> — ignore the sensor, trust the model. <b>1</b> — jump to the reading, discard the model. The filter settles wherever those two errors balance.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">The five lines, with this step's numbers</h2>
+      <p class="panel-note" id="eq-step">step 0</p>
+    </div>
+    <div class="eqs">
+      <div class="eq" id="eq-1">
+        <span class="cap">1 · Project the state</span>
+        <span class="form"><i>x̂</i>⁻ = <i>F x̂</i></span>
+        <span class="num" id="num-1">—</span>
+      </div>
+      <div class="eq" id="eq-2">
+        <span class="cap">2 · Project the doubt</span>
+        <span class="form"><i>P</i>⁻ = <i>F P F</i>ᵀ + <i>Q</i></span>
+        <span class="num" id="num-2">—</span>
+      </div>
+      <div class="eq" id="eq-3">
+        <span class="cap">3 · Weigh the evidence</span>
+        <span class="form"><i>K</i> = <i>P</i>⁻<i>H</i>ᵀ ⁄ (<i>HP</i>⁻<i>H</i>ᵀ + <i>R</i>)</span>
+        <span class="num" id="num-3">—</span>
+      </div>
+      <div class="eq" id="eq-4">
+        <span class="cap">4 · Correct the state</span>
+        <span class="form"><i>x̂</i> = <i>x̂</i>⁻ + <i>K</i>(<i>z</i> − <i>H x̂</i>⁻)</span>
+        <span class="num" id="num-4">—</span>
+      </div>
+      <div class="eq" id="eq-5">
+        <span class="cap">5 · Correct the doubt</span>
+        <span class="form"><i>P</i> = (<i>I</i> − <i>KH</i>)<i>P</i>⁻</span>
+        <span class="num" id="num-5">—</span>
+      </div>
+    </div>
+    <div class="mat-strip" style="margin-top: 16px">
+      <div class="mat">
+        <span class="name">x̂</span>
+        <div class="grid-vals" id="mat-x" style="grid-template-columns: 1fr"></div>
+        <span class="cap-under">position<br>velocity</span>
+      </div>
+      <div class="mat">
+        <span class="name">P</span>
+        <div class="grid-vals" id="mat-p" style="grid-template-columns: 1fr 1fr"></div>
+        <span class="cap-under">covariance<br>m², m²/s, m²/s²</span>
+      </div>
+      <div class="mat">
+        <span class="name">K</span>
+        <div class="grid-vals" id="mat-k" style="grid-template-columns: 1fr"></div>
+        <span class="cap-under">gain</span>
+      </div>
+    </div>
+  </div>
+
+  <details class="data">
+    <summary>Step-by-step data</summary>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>k</th><th>t (s)</th><th>true p (m)</th><th>measured z (m)</th>
+            <th>estimate p̂ (m)</th><th>σ<sub>p</sub> (m)</th><th>K<sub>p</sub></th>
+            <th>true v (m/s)</th><th>estimate v̂ (m/s)</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </details>
+
+  <footer>
+    Constant-velocity model, state <code>x = [position, velocity]</code>, scalar position measurement.
+    Process noise uses the discrete white-noise-acceleration form
+    <code>Q = σa² · [[dt⁴/4, dt³/2], [dt³/2, dt²]]</code>. The target's true motion is a sinusoidal
+    acceleration plus a random walk and a little drag, so the model is deliberately imperfect — as it
+    always is in a real lab. At the default tuning the estimate stays inside its own ±2σ band about 91%
+    of the time, a shade under the nominal 95%: the price of that mismatch.
+    Everything runs live in this page from a seeded generator; nothing is pre-recorded.
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ============================ model ============================
+  const N = 170, DT = 0.15, DROP0 = 87, DROP1 = 114;
+
+  const P = {
+    rSigma: 6.0,     // measurement noise std, m
+    qSigma: 2.0,     // assumed acceleration std, m/s^2
+    seed: 20250812,
+    dropout: false
+  };
+
+  const ui = { k: 0, phase: "predict", playing: false };
+  let sim = null;
+
+  const mulberry32 = a => () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const normal = rng => {
+    let u = 0, v = 0;
+    while (u === 0) u = rng();
+    while (v === 0) v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+
+  function simulate() {
+    const rng = mulberry32(P.seed);
+
+    // --- ground truth: sinusoidal acceleration + random walk ---
+    const t = [], truthP = [], truthV = [];
+    let pos = 0, vel = 5;
+    for (let k = 0; k < N; k++) {
+      const tk = k * DT;
+      t.push(tk); truthP.push(pos); truthV.push(vel);
+      const a = 0.9 * Math.sin(0.5 * tk) + 1.2 * normal(rng) - 0.08 * vel;
+      pos += vel * DT + 0.5 * a * DT * DT;
+      vel += a * DT;
+    }
+
+    // --- measurements: draw unit noise first so sliders don't reshuffle it ---
+    const unit = [];
+    for (let k = 0; k < N; k++) unit.push(normal(rng));
+    const z = truthP.map((p, k) =>
+      (P.dropout && k >= DROP0 && k < DROP1) ? null : p + P.rSigma * unit[k]);
+
+    // --- filter ---
+    const R = P.rSigma * P.rSigma;
+    const q = P.qSigma * P.qSigma;
+    const Q = [
+      [q * DT ** 4 / 4, q * DT ** 3 / 2],
+      [q * DT ** 3 / 2, q * DT ** 2]
+    ];
+
+    let x = [0, 0];                       // deliberately wrong start
+    let Pm = [[600, 0], [0, 250]];        // and very unsure about it
+
+    const st = [];
+    for (let k = 0; k < N; k++) {
+      // 1-2 · predict
+      const xPri = [x[0] + x[1] * DT, x[1]];
+      const p00 = Pm[0][0] + DT * (Pm[1][0] + Pm[0][1]) + DT * DT * Pm[1][1] + Q[0][0];
+      const p01 = Pm[0][1] + DT * Pm[1][1] + Q[0][1];
+      const p10 = Pm[1][0] + DT * Pm[1][1] + Q[1][0];
+      const p11 = Pm[1][1] + Q[1][1];
+      const Ppri = [[p00, p01], [p10, p11]];
+
+      // 3-5 · update
+      let xPost, Ppost, K = [0, 0], S = null, innov = null;
+      if (z[k] === null) {
+        xPost = xPri.slice();
+        Ppost = [Ppri[0].slice(), Ppri[1].slice()];
+      } else {
+        S = p00 + R;
+        K = [p00 / S, p10 / S];
+        innov = z[k] - xPri[0];
+        xPost = [xPri[0] + K[0] * innov, xPri[1] + K[1] * innov];
+        Ppost = [
+          [(1 - K[0]) * p00, (1 - K[0]) * p01],
+          [p10 - K[1] * p00, p11 - K[1] * p01]
+        ];
+      }
+
+      st.push({ k, t: t[k], z: z[k], xPri, Ppri, xPost, Ppost, K, S, innov });
+      x = xPost; Pm = Ppost;
+    }
+
+    // --- error, past the initial transient ---
+    const warm = 10;
+    let sm = 0, nm = 0, sf = 0, nf = 0;
+    for (let k = warm; k < N; k++) {
+      if (z[k] !== null) { sm += (z[k] - truthP[k]) ** 2; nm++; }
+      sf += (st[k].xPost[0] - truthP[k]) ** 2; nf++;
+    }
+    const rmseM = nm ? Math.sqrt(sm / nm) : 0;
+    const rmseF = nf ? Math.sqrt(sf / nf) : 0;
+
+    return { t, truthP, truthV, z, st, R, Q, rmseM, rmseF, Qmat: Q };
+  }
+
+  // ============================ canvas plumbing ============================
+  let TOK = {};
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = n => cs.getPropertyValue(n).trim();
+    TOK = {
+      ink: g("--ink"), ink2: g("--ink-2"), muted: g("--muted"),
+      grid: g("--grid"), rule: g("--rule"), panel: g("--panel"), inset: g("--inset"),
+      est: g("--est"), estSoft: g("--est-soft"), estWash: g("--est-wash"),
+      meas: g("--meas"), measSoft: g("--meas-soft"),
+      pred: g("--pred"), predSoft: g("--pred-soft"),
+      truth: g("--truth")
+    };
+  }
+
+  function frame(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = cv.getBoundingClientRect();
+    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    if (cv.width !== w * dpr || cv.height !== h * dpr) {
+      cv.width = w * dpr; cv.height = h * dpr;
+    }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+
+  const LABEL_FONT = '11px ' + getComputedStyle(document.body).fontFamily;
+
+  function niceTicks(lo, hi, count) {
+    const span = (hi - lo) || 1;
+    const raw = span / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    const step = (norm >= 5 ? 10 : norm >= 2 ? 5 : norm >= 1 ? 2 : 1) * mag;
+    const out = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(v);
+    return out;
+  }
+
+  function axes(ctx, box, xr, yr, opts) {
+    const { l, tp, w, h } = box;
+    const fmtY = opts.fmtY || (v => String(Math.round(v)));
+    const fmtX = opts.fmtX || (v => v.toFixed(0));
+    ctx.font = LABEL_FONT;
+    ctx.lineWidth = 1;
+
+    ctx.strokeStyle = TOK.grid;
+    ctx.fillStyle = TOK.muted;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (const v of niceTicks(yr[0], yr[1], opts.yTicks || 4)) {
+      const y = Math.round(box.y(v)) + .5;
+      ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + w, y); ctx.stroke();
+      ctx.fillText(fmtY(v), l - 7, y);
+    }
+    // thin the ticks out on narrow canvases so labels never collide
+    const nx = Math.max(3, Math.min(opts.xTicks || 6, Math.floor(w / 62)));
+    ctx.textBaseline = "top";
+    for (const v of niceTicks(xr[0], xr[1], nx)) {
+      const x = Math.round(box.x(v)) + .5;
+      ctx.beginPath(); ctx.moveTo(x, tp); ctx.lineTo(x, tp + h); ctx.stroke();
+      const label = fmtX(v);
+      const tw = ctx.measureText(label).width;
+      // the outermost labels align inward rather than run off the canvas
+      ctx.textAlign = (x - tw / 2 < 2) ? "left" : (x + tw / 2 > l + w + 12) ? "right" : "center";
+      ctx.fillText(label, x, tp + h + 6);
+    }
+    ctx.textAlign = "center";
+    if (opts.yLabel) {
+      ctx.save();
+      ctx.translate(11, tp + h / 2); ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = TOK.muted;
+      ctx.fillText(opts.yLabel, 0, 0);
+      ctx.restore();
+    }
+    if (opts.xLabel && w > 240) {
+      ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+      ctx.fillStyle = TOK.muted;
+      ctx.fillText(opts.xLabel, l + w, tp + h + 35);
+    }
+  }
+
+  function makeBox(w, h, pad) {
+    const l = pad.l, tp = pad.t;
+    const bw = Math.max(10, w - pad.l - pad.r);
+    const bh = Math.max(10, h - pad.t - pad.b);
+    return { l, tp, w: bw, h: bh, r: l + bw, b: tp + bh };
+  }
+  function scale(box, xr, yr) {
+    box.x = v => box.l + (v - xr[0]) / ((xr[1] - xr[0]) || 1) * box.w;
+    box.y = v => box.tp + box.h - (v - yr[0]) / ((yr[1] - yr[0]) || 1) * box.h;
+    return box;
+  }
+
+  function polyline(ctx, pts, color, width, dash) {
+    if (pts.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function bandPath(ctx, upper, lower, fill) {
+    if (upper.length < 2) return;
+    ctx.save();
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(upper[0][0], upper[0][1]);
+    for (let i = 1; i < upper.length; i++) ctx.lineTo(upper[i][0], upper[i][1]);
+    for (let i = lower.length - 1; i >= 0; i--) ctx.lineTo(lower[i][0], lower[i][1]);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // a direct label with a surface ring, so it survives on top of marks
+  const CHIP_FONT = "600 11px " + getComputedStyle(document.body).fontFamily;
+  function chip(ctx, x, y, text, color, align) {
+    ctx.save();
+    ctx.font = CHIP_FONT;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = align || "left";
+    ctx.lineWidth = 3; ctx.strokeStyle = TOK.panel; ctx.lineJoin = "round";
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  // Place centred labels so they never sit on top of each other: keep the
+  // preferred spot when it is free, otherwise lift the label clear.
+  function placeLabels(ctx, box, labels) {
+    ctx.save();
+    ctx.font = CHIP_FONT;
+    const placed = [];
+    const boxes = labels
+      .map(l => ({ ...l, w: ctx.measureText(l.text).width }))
+      .sort((a, b) => a.y - b.y);
+    for (const l of boxes) {
+      let y = Math.max(box.tp + 8, l.y);
+      let guard = 0;
+      while (guard++ < 40 && placed.some(p =>
+        Math.abs(p.x - l.x) < (p.w + l.w) / 2 + 6 && Math.abs(p.y - y) < 14)) {
+        y -= 15;
+      }
+      if (y < box.tp + 8) y = box.tp + 8;
+      // keep the text inside the plot horizontally
+      const x = Math.max(box.l + l.w / 2, Math.min(box.r - l.w / 2, l.x));
+      placed.push({ x, y, w: l.w });
+      l.x = x; l.y = y;
+    }
+    ctx.restore();
+    for (const l of boxes) chip(ctx, l.x, l.y, l.text, l.color, "center");
+  }
+
+  // ============================ charts ============================
+  const cvTrack = document.getElementById("track");
+  const cvFusion = document.getElementById("fusion");
+  const cvVel = document.getElementById("vel");
+  const cvSigma = document.getElementById("sigma");
+  const cvGain = document.getElementById("gain");
+  const tt = document.getElementById("tt");
+
+  let hoverK = null;
+  let trackBox = null;
+
+  function drawTrack() {
+    const { ctx, w, h } = frame(cvTrack);
+    const box = scale(makeBox(w, h, { l: 52, r: 58, t: 12, b: 42 }), [0, sim.t[N - 1]], yRangeTrack());
+    trackBox = box;
+    const k = ui.k;
+
+    // dropout region
+    if (P.dropout) {
+      ctx.save();
+      ctx.fillStyle = TOK.inset;
+      const x0 = box.x(DROP0 * DT), x1 = box.x((DROP1 - 1) * DT);
+      ctx.fillRect(x0, box.tp, x1 - x0, box.h);
+      ctx.restore();
+    }
+
+    axes(ctx, box, [0, sim.t[N - 1]], yRangeTrack(), {
+      fmtY: v => v.toFixed(0), fmtX: v => v.toFixed(0),
+      yLabel: "position (m)", xLabel: "time (s)", yTicks: 5, xTicks: 7
+    });
+
+    if (P.dropout) {
+      const xm = (box.x(DROP0 * DT) + box.x((DROP1 - 1) * DT)) / 2;
+      chip(ctx, xm, box.tp + 12, "no measurements", TOK.muted, "center");
+    }
+
+    // ±2σ band up to k
+    const up = [], lo = [];
+    for (let i = 0; i <= k; i++) {
+      const s = sim.st[i], sd = Math.sqrt(Math.max(0, s.Ppost[0][0]));
+      up.push([box.x(s.t), box.y(s.xPost[0] + 2 * sd)]);
+      lo.push([box.x(s.t), box.y(s.xPost[0] - 2 * sd)]);
+    }
+    bandPath(ctx, up, lo, TOK.estSoft);
+
+    // truth — full run, it is the reference
+    polyline(ctx, sim.t.map((t, i) => [box.x(t), box.y(sim.truthP[i])]), TOK.truth, 2);
+
+    // measurements
+    ctx.save();
+    for (let i = 0; i < N; i++) {
+      if (sim.z[i] === null) continue;
+      const future = i > k;
+      ctx.globalAlpha = future ? 0.16 : 1;
+      ctx.beginPath();
+      ctx.arc(box.x(sim.t[i]), box.y(sim.z[i]), future ? 2 : 2.8, 0, Math.PI * 2);
+      ctx.fillStyle = TOK.meas; ctx.fill();
+      if (!future) { ctx.lineWidth = 1.5; ctx.strokeStyle = TOK.panel; ctx.stroke(); }
+    }
+    ctx.restore();
+
+    // estimate up to k
+    polyline(ctx, sim.st.slice(0, k + 1).map(s => [box.x(s.t), box.y(s.xPost[0])]), TOK.est, 2);
+
+    // current-step marker
+    const cur = sim.st[k];
+    const cx = box.x(cur.t);
+    ctx.save();
+    ctx.strokeStyle = TOK.rule; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(cx + .5, box.tp); ctx.lineTo(cx + .5, box.b); ctx.stroke();
+    ctx.restore();
+
+    const ey = box.y(cur.xPost[0]), ty = box.y(sim.truthP[k]);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, ey, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = TOK.est; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = TOK.panel; ctx.stroke();
+    ctx.restore();
+
+    // direct labels, nudged apart when they collide
+    let eyL = ey, tyL = ty;
+    if (Math.abs(eyL - tyL) < 13) { const s = eyL <= tyL ? -1 : 1; eyL += 7 * s; tyL -= 7 * s; }
+    const lx = Math.min(cx + 9, box.r + 6);
+    chip(ctx, lx, eyL, "estimate", TOK.est, "left");
+    chip(ctx, lx, tyL, "true", TOK.truth, "left");
+
+    // hover crosshair
+    if (hoverK !== null && hoverK !== k) {
+      const hx = box.x(sim.t[hoverK]);
+      ctx.save();
+      ctx.strokeStyle = TOK.muted; ctx.lineWidth = 1; ctx.globalAlpha = .5;
+      ctx.beginPath(); ctx.moveTo(hx + .5, box.tp); ctx.lineTo(hx + .5, box.b); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  let trackYCache = null;
+  function yRangeTrack() {
+    if (trackYCache) return trackYCache;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < N; i++) {
+      lo = Math.min(lo, sim.truthP[i]); hi = Math.max(hi, sim.truthP[i]);
+      if (sim.z[i] !== null) { lo = Math.min(lo, sim.z[i]); hi = Math.max(hi, sim.z[i]); }
+    }
+    const pad = (hi - lo) * 0.12 + 4;
+    trackYCache = [lo - pad, hi + pad];
+    return trackYCache;
+  }
+
+  function gaussian(x, mu, sd) {
+    return Math.exp(-0.5 * ((x - mu) / sd) ** 2) / (sd * Math.sqrt(2 * Math.PI));
+  }
+
+  function drawFusion() {
+    const { ctx, w, h } = frame(cvFusion);
+    const s = sim.st[ui.k];
+    const showUpdate = ui.phase === "update";
+
+    const sdPri = Math.sqrt(Math.max(1e-9, s.Ppri[0][0]));
+    const sdPost = Math.sqrt(Math.max(1e-9, s.Ppost[0][0]));
+    const sdR = P.rSigma;
+
+    const centers = [s.xPri[0], s.xPost[0], sim.truthP[ui.k]];
+    if (s.z !== null) centers.push(s.z);
+    const spread = Math.max(sdPri, sdR, sdPost) * 3.2;
+    let lo = Math.min(...centers) - spread, hi = Math.max(...centers) + spread;
+
+    const box = scale(makeBox(w, h, { l: 44, r: 16, t: 16, b: 42 }), [lo, hi], [0, 1]);
+
+    // vertical scale: tallest curve on screen
+    let peak = gaussian(s.xPri[0], s.xPri[0], sdPri);
+    if (showUpdate) {
+      peak = Math.max(peak, gaussian(s.xPost[0], s.xPost[0], sdPost));
+      if (s.z !== null) peak = Math.max(peak, gaussian(s.z, s.z, sdR));
+    }
+    const yr = [0, peak * 1.16];
+    scale(box, [lo, hi], yr);
+
+    axes(ctx, box, [lo, hi], yr, {
+      fmtY: () => "", yTicks: 3,
+      fmtX: v => v.toFixed(0), xTicks: 5,
+      xLabel: "position (m)", yLabel: "probability density"
+    });
+
+    const curve = (mu, sd) => {
+      const pts = [];
+      for (let i = 0; i <= 220; i++) {
+        const xv = lo + (hi - lo) * i / 220;
+        pts.push([box.x(xv), box.y(gaussian(xv, mu, sd))]);
+      }
+      return pts;
+    };
+    const fillUnder = (pts, color) => {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], box.b);
+      for (const p of pts) ctx.lineTo(p[0], p[1]);
+      ctx.lineTo(pts[pts.length - 1][0], box.b);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    };
+
+    // truth marker — labelled at the foot so it stays clear of the curves
+    const tx = box.x(sim.truthP[ui.k]);
+    ctx.save();
+    ctx.strokeStyle = TOK.truth; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(tx + .5, box.tp); ctx.lineTo(tx + .5, box.b); ctx.stroke();
+    ctx.restore();
+    chip(ctx, tx, box.b - 9, "truth", TOK.truth, "center");
+
+    const labels = [];
+
+    // prediction (prior)
+    const pri = curve(s.xPri[0], sdPri);
+    fillUnder(pri, TOK.predSoft);
+    polyline(ctx, pri, TOK.pred, 2, [5, 4]);
+    labels.push({
+      x: box.x(s.xPri[0]), y: box.y(gaussian(s.xPri[0], s.xPri[0], sdPri)) - 11,
+      text: "prediction", color: TOK.pred
+    });
+
+    if (showUpdate && s.z !== null) {
+      const lik = curve(s.z, sdR);
+      fillUnder(lik, TOK.measSoft);
+      polyline(ctx, lik, TOK.meas, 2, [5, 4]);
+      labels.push({
+        x: box.x(s.z), y: box.y(gaussian(s.z, s.z, sdR)) - 11,
+        text: "measurement", color: TOK.meas
+      });
+
+      const post = curve(s.xPost[0], sdPost);
+      fillUnder(post, TOK.estSoft);
+      polyline(ctx, post, TOK.est, 2.5);
+      labels.push({
+        x: box.x(s.xPost[0]), y: box.y(gaussian(s.xPost[0], s.xPost[0], sdPost)) - 11,
+        text: "new estimate", color: TOK.est
+      });
+    }
+    placeLabels(ctx, box, labels);
+
+    // narration
+    const nar = document.getElementById("narrate");
+    const chipEl = document.getElementById("phase-chip");
+    if (!showUpdate) {
+      chipEl.className = "phase-chip predict"; chipEl.textContent = "Predict";
+      const sdPrev = ui.k > 0 ? Math.sqrt(sim.st[ui.k - 1].Ppost[0][0]) : Math.sqrt(600);
+      nar.innerHTML = `<b>Predict.</b> The model coasts the state forward ${DT.toFixed(2)}&nbsp;s at
+        <b>${s.xPri[1].toFixed(1)}&nbsp;m/s</b>. Nothing new was observed, so the belief only widens:
+        σ <b>${sdPrev.toFixed(2)}</b> → <b>${sdPri.toFixed(2)}&nbsp;m</b>.`;
+    } else if (s.z === null) {
+      chipEl.className = "phase-chip idle"; chipEl.textContent = "No data";
+      nar.innerHTML = `<b>Nothing to fuse.</b> The sensor is dark, so the prediction becomes the estimate
+        unchanged and σ keeps climbing — now <b>${sdPost.toFixed(2)}&nbsp;m</b>. The filter still tracks,
+        it just gets steadily less sure.`;
+    } else {
+      chipEl.className = "phase-chip update"; chipEl.textContent = "Update";
+      const pct = (s.K[0] * 100).toFixed(0);
+      nar.innerHTML = `<b>Update.</b> The reading sits <b>${s.innov.toFixed(1)}&nbsp;m</b> off the prediction.
+        Gain <b>K = ${s.K[0].toFixed(2)}</b> moves the estimate <b>${pct}%</b> of the way there —
+        and the fused belief is sharper than either input: σ <b>${sdPri.toFixed(2)}</b> → <b>${sdPost.toFixed(2)}&nbsp;m</b>.`;
+    }
+  }
+
+  function drawVel() {
+    const { ctx, w, h } = frame(cvVel);
+    const k = ui.k;
+    // fixed over the whole run, so the axis never jumps mid-playback; the
+    // opening band is far taller than this and is clipped to the frame
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < N; i++) {
+      lo = Math.min(lo, sim.truthV[i], sim.st[i].xPost[1]);
+      hi = Math.max(hi, sim.truthV[i], sim.st[i].xPost[1]);
+    }
+    const pad = (hi - lo) * .18 + 1;
+    const yr = [lo - pad, hi + pad];
+    const box = scale(makeBox(w, h, { l: 46, r: 46, t: 12, b: 42 }), [0, sim.t[N - 1]], yr);
+
+    axes(ctx, box, [0, sim.t[N - 1]], yr, {
+      fmtY: v => v.toFixed(0), fmtX: v => v.toFixed(0),
+      yLabel: "velocity (m/s)", xLabel: "time (s)", yTicks: 4, xTicks: 6
+    });
+
+    const up = [], dn = [];
+    for (let i = 0; i <= k; i++) {
+      const s = sim.st[i], sd = Math.sqrt(Math.max(0, s.Ppost[1][1]));
+      up.push([box.x(s.t), box.y(s.xPost[1] + 2 * sd)]);
+      dn.push([box.x(s.t), box.y(s.xPost[1] - 2 * sd)]);
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.rect(box.l, box.tp, box.w, box.h); ctx.clip();
+    bandPath(ctx, up, dn, TOK.estSoft);
+    ctx.restore();
+    polyline(ctx, sim.t.map((t, i) => [box.x(t), box.y(sim.truthV[i])]), TOK.truth, 2);
+    polyline(ctx, sim.st.slice(0, k + 1).map(s => [box.x(s.t), box.y(s.xPost[1])]), TOK.est, 2);
+
+    const cur = sim.st[k];
+    ctx.save();
+    ctx.beginPath(); ctx.arc(box.x(cur.t), box.y(cur.xPost[1]), 4, 0, Math.PI * 2);
+    ctx.fillStyle = TOK.est; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = TOK.panel; ctx.stroke();
+    ctx.restore();
+
+    let ey = box.y(cur.xPost[1]), ty = box.y(sim.truthV[k]);
+    if (Math.abs(ey - ty) < 13) { const sg = ey <= ty ? -1 : 1; ey += 7 * sg; ty -= 7 * sg; }
+    const lx = Math.min(box.x(cur.t) + 8, box.r + 4);
+    chip(ctx, lx, ey, "est", TOK.est, "left");
+    chip(ctx, lx, ty, "true", TOK.truth, "left");
+  }
+
+  function drawSigma() {
+    const { ctx, w, h } = frame(cvSigma);
+    const k = ui.k;
+    let hi = 0;
+    for (let i = 1; i <= k; i++) hi = Math.max(hi, Math.sqrt(sim.st[i].Ppri[0][0]));
+    hi = Math.max(hi, P.rSigma * 0.6, 1);
+    const yr = [0, hi * 1.15];
+    const box = scale(makeBox(w, h, { l: 44, r: 14, t: 10, b: 30 }), [0, sim.t[N - 1]], yr);
+    axes(ctx, box, [0, sim.t[N - 1]], yr, {
+      fmtY: v => v.toFixed(1), fmtX: v => v.toFixed(0),
+      yLabel: "σ (m)", yTicks: 3, xTicks: 5
+    });
+    polyline(ctx, sim.st.slice(1, k + 1).map(s => [box.x(s.t), box.y(Math.sqrt(s.Ppri[0][0]))]), TOK.pred, 2);
+    polyline(ctx, sim.st.slice(1, k + 1).map(s => [box.x(s.t), box.y(Math.sqrt(s.Ppost[0][0]))]), TOK.est, 2);
+  }
+
+  function drawGain() {
+    const { ctx, w, h } = frame(cvGain);
+    const k = ui.k;
+    const yr = [0, 1];
+    const box = scale(makeBox(w, h, { l: 44, r: 14, t: 10, b: 30 }), [0, sim.t[N - 1]], yr);
+    axes(ctx, box, [0, sim.t[N - 1]], yr, {
+      fmtY: v => v.toFixed(1), fmtX: v => v.toFixed(0),
+      yLabel: "gain K", yTicks: 4, xTicks: 5
+    });
+    const pts = [];
+    for (let i = 0; i <= k; i++) {
+      if (sim.z[i] === null) { if (pts.length > 1) polyline(ctx, pts, TOK.est, 2); pts.length = 0; continue; }
+      pts.push([box.x(sim.st[i].t), box.y(sim.st[i].K[0])]);
+    }
+    polyline(ctx, pts, TOK.est, 2);
+    const cur = sim.st[k];
+    if (cur.z !== null) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(box.x(cur.t), box.y(cur.K[0]), 4, 0, Math.PI * 2);
+      ctx.fillStyle = TOK.est; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = TOK.panel; ctx.stroke();
+      ctx.restore();
+      chip(ctx, box.x(cur.t) - 8, box.y(cur.K[0]) - 11, cur.K[0].toFixed(2), TOK.est, "right");
+    }
+  }
+
+  // ============================ readouts ============================
+  const f2 = v => {
+    const a = Math.abs(v);
+    return a >= 1e5 ? v.toExponential(1) : a >= 1000 ? v.toFixed(0) : v.toFixed(2);
+  };
+
+  function drawNumbers() {
+    const s = sim.st[ui.k];
+    const upd = ui.phase === "update";
+
+    document.getElementById("eq-step").textContent =
+      `step ${ui.k} · t = ${s.t.toFixed(2)} s`;
+
+    for (const [id, cls] of [["eq-1", "predict"], ["eq-2", "predict"], ["eq-3", "update"], ["eq-4", "update"], ["eq-5", "update"]]) {
+      const el = document.getElementById(id);
+      el.className = "eq" + ((cls === "predict") === !upd ? " live-" + cls : "");
+    }
+
+    document.getElementById("num-1").innerHTML =
+      `p⁻ = <b>${f2(s.xPri[0])}</b> m · v⁻ = <b>${f2(s.xPri[1])}</b> m/s`;
+    document.getElementById("num-2").innerHTML =
+      `σₚ⁻ = <b>${f2(Math.sqrt(s.Ppri[0][0]))}</b> m · σᵥ⁻ = <b>${f2(Math.sqrt(s.Ppri[1][1]))}</b> m/s`;
+    document.getElementById("num-3").innerHTML = s.z === null
+      ? `no measurement — <b>K = 0</b>`
+      : `S = <b>${f2(s.S)}</b> · K = [<b>${s.K[0].toFixed(3)}</b>, <b>${s.K[1].toFixed(3)}</b>]`;
+    document.getElementById("num-4").innerHTML = s.z === null
+      ? `z absent — <b>x̂ = x̂⁻</b>`
+      : `z = <b>${f2(s.z)}</b> · innovation = <b>${f2(s.innov)}</b> m`;
+    document.getElementById("num-5").innerHTML =
+      `σₚ = <b>${f2(Math.sqrt(s.Ppost[0][0]))}</b> m · σᵥ = <b>${f2(Math.sqrt(s.Ppost[1][1]))}</b> m/s`;
+
+    const shown = upd ? { x: s.xPost, P: s.Ppost } : { x: s.xPri, P: s.Ppri };
+    document.getElementById("mat-x").innerHTML =
+      `<span>${f2(shown.x[0])}</span><span>${f2(shown.x[1])}</span>`;
+    document.getElementById("mat-p").innerHTML =
+      `<span>${f2(shown.P[0][0])}</span><span>${f2(shown.P[0][1])}</span>` +
+      `<span>${f2(shown.P[1][0])}</span><span>${f2(shown.P[1][1])}</span>`;
+    document.getElementById("mat-k").innerHTML =
+      `<span>${s.K[0].toFixed(3)}</span><span>${s.K[1].toFixed(3)}</span>`;
+
+    document.getElementById("step-read").textContent =
+      `step ${String(ui.k).padStart(3, "0")} · t = ${s.t.toFixed(2)} s`;
+  }
+
+  function drawStats() {
+    document.getElementById("stat-meas").innerHTML =
+      `${sim.rmseM.toFixed(2)}<span class="unit">m rms</span>`;
+    document.getElementById("stat-filt").innerHTML =
+      `${sim.rmseF.toFixed(2)}<span class="unit">m rms</span>`;
+    const red = sim.rmseM > 0 ? (1 - sim.rmseF / sim.rmseM) * 100 : 0;
+    document.getElementById("stat-gain").innerHTML =
+      `${red >= 0 ? "" : "−"}${Math.abs(red).toFixed(0)}<span class="unit">%</span>`;
+  }
+
+  function buildTable() {
+    const rows = sim.st.map((s, i) =>
+      `<tr data-k="${i}"><td>${i}</td><td>${s.t.toFixed(2)}</td>` +
+      `<td>${sim.truthP[i].toFixed(2)}</td>` +
+      `<td>${s.z === null ? "—" : s.z.toFixed(2)}</td>` +
+      `<td>${s.xPost[0].toFixed(2)}</td>` +
+      `<td>${Math.sqrt(s.Ppost[0][0]).toFixed(2)}</td>` +
+      `<td>${s.z === null ? "—" : s.K[0].toFixed(3)}</td>` +
+      `<td>${sim.truthV[i].toFixed(2)}</td>` +
+      `<td>${s.xPost[1].toFixed(2)}</td></tr>`
+    ).join("");
+    document.getElementById("tbody").innerHTML = rows;
+    markTableRow();
+  }
+  function markTableRow() {
+    const body = document.getElementById("tbody");
+    const prev = body.querySelector("tr.cur");
+    if (prev) prev.classList.remove("cur");
+    const row = body.children[ui.k];
+    if (row) row.classList.add("cur");
+  }
+
+  // ============================ render ============================
+  function renderCharts() {
+    readTokens();
+    drawTrack(); drawFusion(); drawVel(); drawSigma(); drawGain();
+  }
+  function renderAll() {
+    renderCharts(); drawNumbers(); markTableRow();
+    document.getElementById("scrub").value = String(ui.k);
+  }
+  function rebuild(keepK) {
+    sim = simulate();
+    trackYCache = null;
+    if (!keepK) ui.k = 0;
+    ui.k = Math.min(ui.k, N - 1);
+    buildTable(); drawStats(); renderAll();
+  }
+
+  // ============================ interaction ============================
+  const playBtn = document.getElementById("play");
+  function setPlaying(on) {
+    ui.playing = on;
+    playBtn.textContent = on ? "Pause" : "Play";
+    playBtn.setAttribute("aria-pressed", String(on));
+    if (on) { last = performance.now(); acc = 0; requestAnimationFrame(tick); }
+  }
+  function advance() {
+    if (ui.phase === "predict") { ui.phase = "update"; }
+    else {
+      ui.phase = "predict";
+      ui.k = ui.k + 1 >= N ? 0 : ui.k + 1;
+      if (ui.k === 0) { /* wrapped */ }
+    }
+    renderAll();
+  }
+
+  let last = 0, acc = 0;
+  const PHASE_MS = 340;
+  function tick(now) {
+    if (!ui.playing) return;
+    acc += now - last; last = now;
+    while (acc >= PHASE_MS) { acc -= PHASE_MS; advance(); }
+    requestAnimationFrame(tick);
+  }
+
+  playBtn.addEventListener("click", () => setPlaying(!ui.playing));
+  document.getElementById("step").addEventListener("click", () => { setPlaying(false); advance(); });
+  document.getElementById("reset").addEventListener("click", () => {
+    setPlaying(false); ui.k = 0; ui.phase = "predict"; renderAll();
+  });
+  document.getElementById("reseed").addEventListener("click", () => {
+    P.seed = (Math.random() * 1e9) | 0; rebuild(true);
+  });
+  document.getElementById("dropout").addEventListener("change", e => {
+    P.dropout = e.target.checked; rebuild(true);
+  });
+
+  const scrub = document.getElementById("scrub");
+  scrub.max = String(N - 1);
+  scrub.addEventListener("input", e => {
+    setPlaying(false);
+    ui.k = +e.target.value; ui.phase = "update";
+    renderAll();
+  });
+
+  const rSlider = document.getElementById("rnoise");
+  rSlider.addEventListener("input", e => {
+    P.rSigma = +e.target.value;
+    document.getElementById("rnoise-val").textContent = P.rSigma.toFixed(1) + " m";
+    rebuild(true);
+  });
+  const qSlider = document.getElementById("qnoise");
+  qSlider.addEventListener("input", e => {
+    P.qSigma = +e.target.value;
+    document.getElementById("qnoise-val").textContent = P.qSigma.toFixed(2) + " m/s²";
+    rebuild(true);
+  });
+
+  // hover + scrub on the main chart
+  function kFromEvent(e) {
+    if (!trackBox) return null;
+    const r = cvTrack.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const frac = (x - trackBox.l) / trackBox.w;
+    return Math.max(0, Math.min(N - 1, Math.round(frac * (N - 1))));
+  }
+  function showTip(kk, e) {
+    const s = sim.st[kk];
+    const sd = Math.sqrt(Math.max(0, s.Ppost[0][0]));
+    tt.innerHTML =
+      `<div class="tt-t">t = ${s.t.toFixed(2)} s · step ${kk}</div>` +
+      `<div class="row"><span class="k"><span class="swatch line" style="background:var(--truth)"></span>True</span><span class="v">${sim.truthP[kk].toFixed(1)} m</span></div>` +
+      `<div class="row"><span class="k"><span class="swatch dot" style="background:var(--meas)"></span>Measured</span><span class="v">${s.z === null ? "—" : s.z.toFixed(1) + " m"}</span></div>` +
+      `<div class="row"><span class="k"><span class="swatch line" style="background:var(--est)"></span>Estimate</span><span class="v">${s.xPost[0].toFixed(1)} m</span></div>` +
+      `<div class="row"><span class="k">σ</span><span class="v">${sd.toFixed(2)} m</span></div>` +
+      `<div class="row"><span class="k">K</span><span class="v">${s.z === null ? "—" : s.K[0].toFixed(2)}</span></div>`;
+    tt.classList.add("on");
+    const r = cvTrack.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const w = tt.offsetWidth || 170;
+    tt.style.left = Math.max(0, Math.min(r.width - w, x + 14)) + "px";
+    tt.style.top = Math.max(0, y - 10) + "px";
+  }
+  cvTrack.addEventListener("pointermove", e => {
+    const kk = kFromEvent(e);
+    if (kk === null) return;
+    hoverK = kk; showTip(kk, e);
+    if (e.buttons === 1) { ui.k = kk; ui.phase = "update"; renderAll(); }
+    else drawTrack();
+  });
+  cvTrack.addEventListener("pointerleave", () => { hoverK = null; tt.classList.remove("on"); drawTrack(); });
+  cvTrack.addEventListener("pointerdown", e => {
+    const kk = kFromEvent(e);
+    if (kk === null) return;
+    setPlaying(false);
+    ui.k = kk; ui.phase = "update"; renderAll();
+    cvTrack.setPointerCapture(e.pointerId);
+  });
+
+  document.getElementById("tbody").addEventListener("click", e => {
+    const row = e.target.closest("tr[data-k]");
+    if (!row) return;
+    setPlaying(false);
+    ui.k = +row.dataset.k; ui.phase = "update"; renderAll();
+  });
+
+  window.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
+    if (e.code === "Space") { e.preventDefault(); setPlaying(!ui.playing); }
+    else if (e.code === "ArrowRight") { e.preventDefault(); setPlaying(false); advance(); }
+    else if (e.code === "ArrowLeft") {
+      e.preventDefault(); setPlaying(false);
+      ui.k = Math.max(0, ui.k - 1); ui.phase = "update"; renderAll();
+    }
+  });
+
+  // theme + size
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", renderCharts);
+  new MutationObserver(renderCharts).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  let rt = null;
+  new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(renderCharts, 60); })
+    .observe(document.querySelector(".wrap"));
+
+  // ============================ go ============================
+  rebuild(false);
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setPlaying(true);
+})();
+</script>
