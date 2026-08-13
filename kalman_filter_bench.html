@@ -561,9 +561,13 @@
     <div class="panel">
       <div class="panel-head">
         <h2 class="panel-title">Kalman gain K<sub>p</sub></h2>
+        <div class="legend">
+          <span class="item" style="color: var(--truth)"><span class="dash"></span><span style="color: var(--ink-2)">Asymptote K<sub>∞</sub></span></span>
+        </div>
       </div>
-      <div class="chart"><canvas id="gain" aria-label="Kalman gain for position over time, between 0 and 1."></canvas></div>
+      <div class="chart"><canvas id="gain" aria-label="Kalman gain for position over time, between 0 and 1, converging to its steady-state value."></canvas></div>
       <p class="panel-note" style="margin-top: 8px"><b>0</b> — ignore the sensor, trust the model. <b>1</b> — jump to the reading, discard the model. The filter settles wherever those two errors balance.</p>
+      <p class="panel-note callout" id="gain-note"></p>
     </div>
   </div>
 
@@ -1223,6 +1227,16 @@
     polyline(ctx, sim.st.slice(1, k + 1).map(s => [box.x(s.t), box.y(Math.sqrt(s.Ppost[0][0]))]), TOK.est, 2);
   }
 
+  // Steady-state gain in closed form (Kalata's alpha-beta solution). Matches the
+  // Riccati fixed point to 5 decimals, and costs nothing to evaluate.
+  function steadyGain(rSigma, qSigma) {
+    const lam = qSigma * DT * DT / rSigma;              // tracking index
+    const r = (4 + lam - Math.sqrt(8 * lam + lam * lam)) / 4;
+    const alpha = 1 - r * r;
+    const beta = 2 * (2 - alpha) - 4 * Math.sqrt(1 - alpha);
+    return { lam, alpha, beta, kv: beta / DT };
+  }
+
   function drawGain() {
     const { ctx, w, h } = frame(cvGain);
     const k = ui.k;
@@ -1232,6 +1246,17 @@
       fmtY: v => v.toFixed(1), fmtX: v => v.toFixed(0),
       yLabel: "gain K", yTicks: 4, xTicks: 5
     });
+    // the asymptote the gain is collapsing toward
+    const ss = steadyGain(P.rSigma, P.qSigma);
+    const ay = box.y(ss.alpha);
+    ctx.save();
+    ctx.strokeStyle = TOK.truth; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(box.l, ay + .5); ctx.lineTo(box.r, ay + .5); ctx.stroke();
+    ctx.restore();
+    // Right-hand side, above the line: the curve approaches from above but is flat
+    // by then, and nothing else lives here once the live chip drops out (below).
+    chip(ctx, box.r - 2, ay - 10, `K∞ = ${ss.alpha.toFixed(3)}`, TOK.truth, "right");
+
     const pts = [];
     for (let i = 0; i <= k; i++) {
       if (sim.z[i] === null) { if (pts.length > 1) polyline(ctx, pts, TOK.est, 2); pts.length = 0; continue; }
@@ -1245,7 +1270,10 @@
       ctx.fillStyle = TOK.est; ctx.fill();
       ctx.lineWidth = 2; ctx.strokeStyle = TOK.panel; ctx.stroke();
       ctx.restore();
-      chip(ctx, box.x(cur.t) - 8, box.y(cur.K[0]) - 11, cur.K[0].toFixed(2), TOK.est, "right");
+      // only while the gain still differs from its asymptote — past that the
+      // K∞ label already states the value and a second chip is just clutter
+      if (Math.abs(cur.K[0] - ss.alpha) / ss.alpha > 0.08)
+        chip(ctx, box.x(cur.t) - 8, box.y(cur.K[0]) - 11, cur.K[0].toFixed(2), TOK.est, "right");
     }
   }
 
@@ -1316,6 +1344,22 @@
       consistencyChip();
 
     drawMatch();
+    drawGainNote();
+  }
+
+  // The gain stops depending on the data almost immediately: it is a fixed point
+  // of the Riccati recursion, set entirely by the tuning.
+  function drawGainNote() {
+    const ss = steadyGain(P.rSigma, P.qSigma);
+    document.getElementById("gain-note").innerHTML =
+      `<b>It has a closed form.</b> The gain forgets its starting point and converges to a fixed point
+       set only by the tuning — never by the measurements. With the tracking index
+       <span class="law">λ = σ<sub>a</sub>·dt² / σ<sub>R</sub> = ${ss.lam.toFixed(4)}</span>, the
+       asymptote is <span class="law">K<sub>∞</sub> = [${ss.alpha.toFixed(3)}, ${ss.kv.toFixed(3)}]</span>:
+       at rest this filter steps only <b>${(ss.alpha * 100).toFixed(1)}%</b> of the way toward each new
+       reading. For small λ it approaches <span class="law">K<sub>∞</sub> ≈ √(2λ)</span>. That is why the
+       curve above is flat almost everywhere — it is running a constant-gain filter, and the first
+       few seconds are the only part that is genuinely Kalman.`;
   }
 
   // How far the filter's assumption sits from the target's actual behaviour.
