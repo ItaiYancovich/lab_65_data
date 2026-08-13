@@ -239,6 +239,26 @@
   }
 
   .knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 22px; }
+  .knob-group { display: flex; flex-direction: column; gap: 10px; }
+  .knob-group + .knob-group { padding-top: 14px; border-top: 1px solid var(--rule); }
+  .group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .group-title {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; font-weight: 600;
+    padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor;
+  }
+  .group-title.world  { color: var(--truth); }
+  .group-title.filter { color: var(--est); }
+  .group-sub { font-size: 12.5px; color: var(--muted); }
+  .match-readout { justify-content: center; }
+  .match-readout .m-lab {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .match-readout .m-val { font-size: 15px; font-weight: 600; }
+  .match-readout .m-note { font-size: 12px; color: var(--muted); }
+  .match-readout .m-val.ok   { color: var(--good); }
+  .match-readout .m-val.warn { color: var(--critical); }
   .knob { display: flex; flex-direction: column; gap: 2px; }
   .knob .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .knob label {
@@ -271,6 +291,12 @@
   .vel-stats .verdict.ok  { color: var(--good); }
   .vel-stats .verdict.bad { color: var(--critical); }
   .vel-stats .verdict.meh { color: var(--ink-2); }
+
+  .model-note {
+    margin: 0 0 16px; padding: 11px 13px; max-width: 92ch;
+    background: var(--inset); border-radius: 8px; border-left: 2px solid var(--truth);
+  }
+  .model-note b { color: var(--ink); }
 
   .panel-note.callout {
     margin-top: 10px; padding: 10px 12px;
@@ -425,22 +451,46 @@
         <label class="toggle"><input type="checkbox" id="dropout">Sensor dropout, 13–17&nbsp;s</label>
       </div>
     </div>
-    <div class="knobs">
-      <div class="knob">
-        <div class="top">
-          <label for="rnoise">Measurement noise σ<sub>R</sub></label>
-          <span class="val" id="rnoise-val">6.0 m</span>
-        </div>
-        <input type="range" id="rnoise" min="0.2" max="20" step="0.2" value="6">
-        <span class="hint">How badly the sensor lies. Drives position accuracy hard — and velocity only by its fourth root.</span>
+    <div class="knob-group">
+      <div class="group-head">
+        <span class="group-title world">The world</span>
+        <span class="group-sub">changes what actually happens — the grey truth line and the orange dots move</span>
       </div>
-      <div class="knob">
-        <div class="top">
-          <label for="qnoise">Process noise σ<sub>a</sub></label>
-          <span class="val" id="qnoise-val">1.20 m/s²</span>
+      <div class="knobs">
+        <div class="knob">
+          <div class="top">
+            <label for="rnoise">Sensor noise σ<sub>R</sub></label>
+            <span class="val" id="rnoise-val">6.0 m</span>
+          </div>
+          <input type="range" id="rnoise" min="0.2" max="20" step="0.2" value="6">
+          <span class="hint">How badly the sensor lies. The filter is told this value exactly, so it is never wrong about the sensor.</span>
         </div>
-        <input type="range" id="qnoise" min="0.05" max="6" step="0.05" value="1.2">
-        <span class="hint">How much the target is allowed to surprise the model. Raise it and the filter stops trusting itself — and this, not the sensor, is the knob that governs velocity accuracy.</span>
+        <div class="knob">
+          <div class="top">
+            <label for="atrue">Target manoeuvring σ<sub>a</sub><sup>true</sup></label>
+            <span class="val" id="atrue-val">0.60 m/s²</span>
+          </div>
+          <input type="range" id="atrue" min="0.05" max="3" step="0.05" value="0.6">
+          <span class="hint">How hard the target really accelerates. This is the only knob that redraws the trajectory itself.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="knob-group">
+      <div class="group-head">
+        <span class="group-title filter">The filter's assumption</span>
+        <span class="group-sub">changes only what the filter believes — the trajectory stays put</span>
+      </div>
+      <div class="knobs">
+        <div class="knob">
+          <div class="top">
+            <label for="qnoise">Assumed manoeuvring σ<sub>a</sub></label>
+            <span class="val" id="qnoise-val">1.20 m/s²</span>
+          </div>
+          <input type="range" id="qnoise" min="0.05" max="6" step="0.05" value="1.2">
+          <span class="hint" id="match-hint">What the filter <em>guesses</em> the target might do. It never touches the target — only how much the filter is willing to be surprised.</span>
+        </div>
+        <div class="knob match-readout" id="match-readout"></div>
       </div>
     </div>
   </div>
@@ -485,11 +535,12 @@
         only the <em>fourth root</em> of the sensor noise. Take σ<sub>R</sub> from 20 m down to 0.2 m —
         a 100× better sensor — and position error drops about 32×, velocity barely 4×.
         <br><br>
-        Nor is σ<sub>a</sub> a free lunch. It has to match how hard the target really manoeuvres, and
-        winding it down makes the filter's <em>claim</em> fall far faster than its real error: at
-        σ<sub>a</sub> = 0.3 it advertises σ<sub>v</sub> = 0.29 m/s while actually missing by 0.66. The
-        self-assessment above turns red the moment that happens. What the target really does sets the
-        floor on velocity, and neither knob buys past it.
+        Nor is the assumed σ<sub>a</sub> a free lunch — and note it changes nothing about the target,
+        only the filter's willingness to be surprised. Wind it below what the target actually does and
+        the filter's <em>claim</em> falls far faster than its real error: assume 0.3 against a true 0.6
+        and it advertises σ<sub>v</sub> = 0.29 m/s while actually missing by 0.66. The self-assessment
+        above turns red the moment that happens. What the target really does sets the floor on velocity,
+        and no amount of assuming otherwise buys past it.
       </p>
     </div>
   </div>
@@ -521,6 +572,16 @@
       <h2 class="panel-title">The five lines, with this step's numbers</h2>
       <p class="panel-note" id="eq-step">step 0</p>
     </div>
+    <p class="panel-note model-note">
+      <b>The model.</b> The state is <span class="law">x = [position, velocity]</span>. Over one 150 ms
+      step the filter assumes the target simply <em>holds its velocity</em> —
+      <span class="law">p ← p + v·dt</span>, <span class="law">v ← v</span> — and that everything it got
+      wrong by assuming that is a single burst of acceleration, drawn fresh each step from a normal
+      distribution of width σ<sub>a</sub>. That is the whole physics: <em>constant velocity, plus an
+      allowance for being wrong about it.</em> The allowance is <span class="law">Q</span>, and it is
+      what the assumed-manoeuvring slider sets. The real target ignores all of this — it accelerates
+      however the world sliders tell it to, and the filter's job is to cope.
+    </p>
     <div class="eqs">
       <div class="eq" id="eq-1">
         <span class="cap">1 · Project the state</span>
@@ -607,9 +668,13 @@
   // ============================ model ============================
   const N = 170, DT = 0.15, DROP0 = 87, DROP1 = 114;
 
+  // Two kinds of parameter, and the distinction matters:
+  //   world  — properties of the target and the sensor. These change what actually happens.
+  //   filter — what the filter BELIEVES about the world. These change only the estimate.
   const P = {
-    rSigma: 6.0,     // measurement noise std, m
-    qSigma: 1.2,     // assumed acceleration std, m/s^2
+    rSigma: 6.0,     // world:  sensor noise std, m (the filter is told this exactly)
+    aTrue:  0.6,     // world:  how hard the target really manoeuvres, m/s^2
+    qSigma: 1.2,     // filter: assumed acceleration std, m/s^2
     seed: 20250812,
     dropout: false
   };
@@ -641,7 +706,7 @@
     for (let k = 0; k < N; k++) {
       const tk = k * DT;
       t.push(tk); truthP.push(pos); truthV.push(vel);
-      const a = 0.35 * Math.sin(0.5 * tk) + 0.6 * normal(rng) - 0.06 * (vel - 3.5);
+      const a = 0.35 * Math.sin(0.5 * tk) + P.aTrue * normal(rng) - 0.06 * (vel - 3.5);
       pos += vel * DT + 0.5 * a * DT * DT;
       vel += a * DT;
     }
@@ -1249,6 +1314,22 @@
       `<div class="s"><span class="lab">Process σ<sub>a</sub></span>` +
       `<span class="num">${P.qSigma.toFixed(2)}<small>m/s²</small></span></div>` +
       consistencyChip();
+
+    drawMatch();
+  }
+
+  // How far the filter's assumption sits from the target's actual behaviour.
+  function drawMatch() {
+    const ratio = P.qSigma / P.aTrue;
+    let cls, word;
+    if (ratio > 3) { cls = "warn"; word = "far too twitchy — it trusts the sensor more than it should"; }
+    else if (ratio > 1.6) { cls = "ok"; word = "conservative, the usual safe choice"; }
+    else if (ratio >= 0.8) { cls = "ok"; word = "well matched to the target"; }
+    else { cls = "warn"; word = "too stiff — it will lag real manoeuvres and overstate its precision"; }
+    document.getElementById("match-readout").innerHTML =
+      `<span class="m-lab">Assumed ÷ true</span>` +
+      `<span class="m-val ${cls}">${ratio.toFixed(1)}×</span>` +
+      `<span class="m-note">${word}</span>`;
   }
 
   // Does the filter's own σv match the error it actually makes? Status is carried
@@ -1360,6 +1441,12 @@
   qSlider.addEventListener("input", e => {
     P.qSigma = +e.target.value;
     document.getElementById("qnoise-val").textContent = P.qSigma.toFixed(2) + " m/s²";
+    rebuild(true);
+  });
+  const aSlider = document.getElementById("atrue");
+  aSlider.addEventListener("input", e => {
+    P.aTrue = +e.target.value;
+    document.getElementById("atrue-val").textContent = P.aTrue.toFixed(2) + " m/s²";
     rebuild(true);
   });
 
