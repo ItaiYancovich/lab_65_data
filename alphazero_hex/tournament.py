@@ -59,6 +59,8 @@ def run_tournament(
     seed: int = 0,
     out_dir: str | Path = "runs/tournament",
     verbose: bool = True,
+    anchor: str | None = None,
+    anchor_rating: float = 0.0,
 ) -> dict:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -86,7 +88,7 @@ def run_tournament(
         for i, task in enumerate(tasks):
             games.append(_play_one(task))
 
-    summary = summarise(games, specs)
+    summary = summarise(games, specs, anchor=anchor, anchor_rating=anchor_rating)
     summary["board_size"] = board_size
     summary["games_per_pair"] = games_per_pair
     summary["total_seconds"] = time.time() - t0
@@ -97,7 +99,12 @@ def run_tournament(
     return summary
 
 
-def summarise(games: list[dict], specs: list[AgentSpec]) -> dict:
+def summarise(
+    games: list[dict],
+    specs: list[AgentSpec],
+    anchor: str | None = None,
+    anchor_rating: float = 0.0,
+) -> dict:
     labels = [s.label for s in specs]
     idx = {l: i for i, l in enumerate(labels)}
     k = len(labels)
@@ -124,7 +131,8 @@ def summarise(games: list[dict], specs: list[AgentSpec]) -> dict:
     for i in range(k):
         for j in range(i + 1, k):
             results.append((labels[i], labels[j], int(wins[i, j]), int(wins[j, i])))
-    elo = fit_elo(results, anchor=labels[0], anchor_rating=0.0)
+    # Anchoring on a shared agent puts separate tournaments on one scale.
+    elo = fit_elo(results, anchor=anchor or labels[0], anchor_rating=anchor_rating)
     errs = elo_standard_errors(results, elo)
 
     table = []

@@ -1,0 +1,77 @@
+tournament: 6 agents, 450 games on 11x11, 4 workers
+  10/450 games (0s, eta 0 min)
+  20/450 games (0s, eta 0 min)
+  30/450 games (1s, eta 0 min)
+  40/450 games (58s, eta 10 min)
+  50/450 games (96s, eta 13 min)
+  60/450 games (159s, eta 17 min)
+  70/450 games (186s, eta 17 min)
+  80/450 games (227s, eta 18 min)
+  90/450 games (269s, eta 18 min)
+  100/450 games (269s, eta 16 min)
+  110/450 games (269s, eta 14 min)
+  120/450 games (269s, eta 12 min)
+  130/450 games (282s, eta 12 min)
+  140/450 games (292s, eta 11 min)
+  150/450 games (307s, eta 10 min)
+  160/450 games (403s, eta 12 min)
+  170/450 games (462s, eta 13 min)
+  180/450 games (538s, eta 13 min)
+  190/450 games (563s, eta 13 min)
+  200/450 games (607s, eta 13 min)
+  210/450 games (651s, eta 12 min)
+  220/450 games (651s, eta 11 min)
+  230/450 games (651s, eta 10 min)
+  240/450 games (651s, eta 10 min)
+  250/450 games (662s, eta 9 min)
+  260/450 games (680s, eta 8 min)
+  270/450 games (693s, eta 8 min)
+  280/450 games (798s, eta 8 min)
+  290/450 games (884s, eta 8 min)
+  300/450 games (967s, eta 8 min)
+  310/450 games (989s, eta 7 min)
+  320/450 games (1017s, eta 7 min)
+  330/450 games (1052s, eta 6 min)
+  340/450 games (1098s, eta 6 min)
+  350/450 games (1146s, eta 5 min)
+  360/450 games (1199s, eta 5 min)
+  370/450 games (1222s, eta 4 min)
+  380/450 games (1252s, eta 4 min)
+  390/450 games (1280s, eta 3 min)
+  400/450 games (1335s, eta 3 min)
+  410/450 games (1370s, eta 2 min)
+  420/450 games (1411s, eta 2 min)
+  430/450 games (1453s, eta 1 min)
+  440/450 games (1497s, eta 1 min)
+  450/450 games (1532s, eta 0 min)
+
+# AlphaZero for Hex 11x11 -- tournament results
+
+450 games, 30 per pairing, colours balanced (every opening played from both sides).
+Average game length 38 plies. Black (first player) won 50.0% of all games.
+
+## Standings
+
+| # | Agent | W | L | Win % | Elo | +/- | s/move |
+|---|-------|---|---|-------|-----|-----|--------|
+| 1 | AlphaZero (400 sims) | 149 | 1 | 99.3% | 2653 | 177 | 0.47 |
+| 2 | AlphaZero policy only (no search) | 121 | 29 | 80.7% | 2137 | 137 | 0.00 |
+| 3 | classic MCTS rollouts (1.0s/move) | 88 | 62 | 58.7% | 1527 | 96 | 0.98 |
+| 4 | brute-force alpha-beta (1.0s/move) | 60 | 90 | 40.0% | 1134 | 96 | 0.79 |
+| 5 | rule-based (two-distance+bridges) | 32 | 118 | 21.3% | 726 | 110 | 0.00 |
+| 6 | random | 0 | 150 | 0.0% | 0 | 227 | 0.00 |
+
+Elo is a Bradley-Terry maximum-likelihood fit, anchored at `random` = 0.
+
+## Head-to-head (row's wins against column)
+
+| |random|rule-based|brute-force alpha-|classic MCTS rollo|AlphaZero policy o|AlphaZero|
+|---|---|---|---|---|---|---|
+|random|--|0-30|0-30|0-30|0-30|0-30|
+|rule-based|30-0|--|1-29|1-29|0-30|0-30|
+|brute-force alpha-|30-0|29-1|--|1-29|0-30|0-30|
+|classic MCTS rollo|30-0|29-1|29-1|--|0-30|0-30|
+|AlphaZero policy o|30-0|30-0|30-0|30-0|--|1-29|
+|AlphaZero|30-0|30-0|30-0|30-0|29-1|--|
+
+written to runs/tournament/report.md

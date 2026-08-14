@@ -1,0 +1,79 @@
+network: 380k parameters (64ch x 5 blocks)
+
+=== stage 1/5: 5x5, 14 iters x 256 games @ 96 sims, lr 0.002 ===
+  it   1 | 5x5 | games  256 pos   4124 | plies  16.1 | P 2.846 V 0.856 top1 0.12 | sp    34s tr    8s
+  it   2 | 5x5 | games  256 pos   3398 | plies  13.3 | P 2.747 V 0.759 top1 0.22 | sp    23s tr    6s
+  it   3 | 5x5 | games  256 pos   3655 | plies  14.3 | P 2.662 V 0.699 top1 0.28 | sp    23s tr    6s
+  it   4 | 5x5 | games  256 pos   3260 | plies  12.7 | P 2.570 V 0.626 top1 0.35 | sp    16s tr    5s
+  it   5 | 5x5 | games  256 pos   3489 | plies  13.6 | P 2.435 V 0.550 top1 0.42 | sp    16s tr    6s
+  it   6 | 5x5 | games  256 pos   3443 | plies  13.4 | P 2.371 V 0.521 top1 0.46 | sp    20s tr    8s | vs rand 1.00 vs rules 0.90
+  it   7 | 5x5 | games  256 pos   3513 | plies  13.7 | P 2.305 V 0.491 top1 0.49 | sp    17s tr    8s
+  it   8 | 5x5 | games  256 pos   3322 | plies  13.0 | P 2.252 V 0.447 top1 0.51 | sp    18s tr    7s
+  it   9 | 5x5 | games  256 pos   3461 | plies  13.5 | P 2.200 V 0.431 top1 0.53 | sp    27s tr    7s
+  it  10 | 5x5 | games  256 pos   3350 | plies  13.1 | P 2.152 V 0.402 top1 0.55 | sp    16s tr    7s
+  it  11 | 5x5 | games  256 pos   3194 | plies  12.5 | P 2.106 V 0.373 top1 0.57 | sp    16s tr    6s
+  it  12 | 5x5 | games  256 pos   3226 | plies  12.6 | P 2.077 V 0.350 top1 0.58 | sp    15s tr    7s | vs rand 1.00 vs rules 1.00
+  it  13 | 5x5 | games  256 pos   3111 | plies  12.2 | P 2.045 V 0.334 top1 0.60 | sp    14s tr    6s
+  it  14 | 5x5 | games  256 pos   3029 | plies  11.8 | P 2.017 V 0.331 top1 0.61 | sp    17s tr    6s
+
+=== stage 2/5: 7x7, 12 iters x 192 games @ 128 sims, lr 0.002 ===
+  it  15 | 7x7 | games  192 pos   4025 | plies  21.0 | P 2.336 V 0.336 top1 0.52 | sp    42s tr   13s
+  it  16 | 7x7 | games  192 pos   4691 | plies  24.4 | P 1.945 V 0.384 top1 0.60 | sp    34s tr   12s
+  it  17 | 7x7 | games  192 pos   4801 | plies  25.0 | P 1.828 V 0.372 top1 0.64 | sp    39s tr   14s
+  it  18 | 7x7 | games  192 pos   4931 | plies  25.7 | P 1.721 V 0.323 top1 0.68 | sp    35s tr   14s
+  it  19 | 7x7 | games  192 pos   4585 | plies  23.9 | P 1.689 V 0.294 top1 0.68 | sp    38s tr   13s
+  it  20 | 7x7 | games  192 pos   4585 | plies  23.9 | P 1.627 V 0.276 top1 0.70 | sp    34s tr   12s | vs rand 1.00 vs rules 1.00
+  it  21 | 7x7 | games  192 pos   4248 | plies  22.1 | P 1.603 V 0.259 top1 0.72 | sp    36s tr   13s
+  it  22 | 7x7 | games  192 pos   4468 | plies  23.3 | P 1.596 V 0.265 top1 0.72 | sp    37s tr   14s
+  it  23 | 7x7 | games  192 pos   4365 | plies  22.7 | P 1.588 V 0.252 top1 0.73 | sp    38s tr   12s
+  it  24 | 7x7 | games  192 pos   4442 | plies  23.1 | P 1.582 V 0.241 top1 0.72 | sp    40s tr   12s
+  it  25 | 7x7 | games  192 pos   4999 | plies  26.0 | P 1.581 V 0.251 top1 0.73 | sp    42s tr   15s
+  it  26 | 7x7 | games  192 pos   4708 | plies  24.5 | P 1.560 V 0.261 top1 0.73 | sp    40s tr   14s | vs rand 1.00 vs rules 1.00
+
+=== stage 3/5: 9x9, 10 iters x 128 games @ 128 sims, lr 0.0015 ===
+  it  27 | 9x9 | games  128 pos   4474 | plies  35.0 | P 1.786 V 0.365 top1 0.70 | sp    58s tr   19s
+  it  28 | 9x9 | games  128 pos   4828 | plies  37.7 | P 1.731 V 0.298 top1 0.73 | sp    65s tr   18s
+  it  29 | 9x9 | games  128 pos   5185 | plies  40.5 | P 1.709 V 0.297 top1 0.72 | sp    63s tr   21s
+  it  30 | 9x9 | games  128 pos   4697 | plies  36.7 | P 1.673 V 0.276 top1 0.72 | sp    62s tr   19s
+  it  31 | 9x9 | games  128 pos   4892 | plies  38.2 | P 1.659 V 0.260 top1 0.73 | sp    59s tr   19s
+  it  32 | 9x9 | games  128 pos   4722 | plies  36.9 | P 1.669 V 0.273 top1 0.73 | sp    63s tr   17s | vs rand 1.00 vs rules 1.00
+  it  33 | 9x9 | games  128 pos   4883 | plies  38.1 | P 1.677 V 0.278 top1 0.72 | sp    65s tr   19s
+  it  34 | 9x9 | games  128 pos   4826 | plies  37.7 | P 1.658 V 0.290 top1 0.73 | sp    58s tr   19s
+  it  35 | 9x9 | games  128 pos   4403 | plies  34.4 | P 1.669 V 0.254 top1 0.73 | sp    55s tr   17s
+  it  36 | 9x9 | games  128 pos   4790 | plies  37.4 | P 1.650 V 0.251 top1 0.73 | sp    61s tr   19s
+
+=== stage 4/5: 11x11, 20 iters x 128 games @ 160 sims, lr 0.001 ===
+  it  37 | 11x11 | games  128 pos   6780 | plies  53.0 | P 1.689 V 0.364 top1 0.68 | sp   134s tr   38s
+  it  38 | 11x11 | games  128 pos   6976 | plies  54.5 | P 1.685 V 0.298 top1 0.68 | sp   150s tr   35s
+  it  39 | 11x11 | games  128 pos   7587 | plies  59.3 | P 1.674 V 0.301 top1 0.70 | sp   144s tr   40s
+  it  40 | 11x11 | games  128 pos   7370 | plies  57.6 | P 1.713 V 0.344 top1 0.68 | sp   148s tr   42s
+  it  41 | 11x11 | games  128 pos   7612 | plies  59.5 | P 1.704 V 0.349 top1 0.68 | sp   151s tr   42s
+  it  42 | 11x11 | games  128 pos   7664 | plies  59.9 | P 1.711 V 0.334 top1 0.69 | sp   159s tr   44s | vs rand 1.00 vs rules 1.00
+  it  43 | 11x11 | games  128 pos   7648 | plies  59.8 | P 1.668 V 0.327 top1 0.70 | sp   134s tr   40s
+  it  44 | 11x11 | games  128 pos   8017 | plies  62.6 | P 1.666 V 0.333 top1 0.69 | sp   144s tr   46s
+  it  45 | 11x11 | games  128 pos   7547 | plies  59.0 | P 1.667 V 0.335 top1 0.69 | sp   136s tr   40s
+  it  46 | 11x11 | games  128 pos   7121 | plies  55.6 | P 1.674 V 0.342 top1 0.70 | sp   149s tr   42s
+  it  47 | 11x11 | games  128 pos   7309 | plies  57.1 | P 1.674 V 0.352 top1 0.70 | sp   158s tr   39s
+  it  48 | 11x11 | games  128 pos   7346 | plies  57.4 | P 1.685 V 0.349 top1 0.69 | sp   148s tr   42s | vs rand 1.00 vs rules 1.00
+  it  49 | 11x11 | games  128 pos   7375 | plies  57.6 | P 1.705 V 0.331 top1 0.69 | sp   155s tr   37s
+  it  50 | 11x11 | games  128 pos   7622 | plies  59.5 | P 1.706 V 0.351 top1 0.69 | sp   154s tr   39s
+  it  51 | 11x11 | games  128 pos   7266 | plies  56.8 | P 1.688 V 0.354 top1 0.70 | sp   122s tr   38s
+  it  52 | 11x11 | games  128 pos   7285 | plies  56.9 | P 1.673 V 0.352 top1 0.70 | sp   153s tr   38s
+  it  53 | 11x11 | games  128 pos   6943 | plies  54.2 | P 1.680 V 0.351 top1 0.69 | sp   115s tr   34s
+  it  54 | 11x11 | games  128 pos   7441 | plies  58.1 | P 1.679 V 0.358 top1 0.70 | sp   169s tr   38s | vs rand 1.00 vs rules 1.00
+  it  55 | 11x11 | games  128 pos   7097 | plies  55.4 | P 1.681 V 0.362 top1 0.69 | sp   143s tr   38s
+  it  56 | 11x11 | games  128 pos   7477 | plies  58.4 | P 1.675 V 0.355 top1 0.70 | sp   146s tr   38s
+
+=== stage 5/5: 11x11, 10 iters x 128 games @ 160 sims, lr 0.0004 ===
+  it  57 | 11x11 | games  128 pos   7799 | plies  60.9 | P 1.675 V 0.346 top1 0.70 | sp   161s tr   41s
+  it  58 | 11x11 | games  128 pos   7522 | plies  58.8 | P 1.661 V 0.343 top1 0.71 | sp   175s tr   37s
+  it  59 | 11x11 | games  128 pos   7390 | plies  57.7 | P 1.666 V 0.340 top1 0.71 | sp   154s tr   35s
+  it  60 | 11x11 | games  128 pos   7717 | plies  60.3 | P 1.671 V 0.350 top1 0.71 | sp   158s tr   41s
+  it  61 | 11x11 | games  128 pos   7442 | plies  58.1 | P 1.666 V 0.354 top1 0.72 | sp   149s tr   40s
+  it  62 | 11x11 | games  128 pos   7494 | plies  58.5 | P 1.658 V 0.352 top1 0.72 | sp   150s tr   40s | vs rand 1.00 vs rules 1.00
+  it  63 | 11x11 | games  128 pos   7382 | plies  57.7 | P 1.661 V 0.354 top1 0.72 | sp   137s tr   33s
+  it  64 | 11x11 | games  128 pos   7158 | plies  55.9 | P 1.658 V 0.353 top1 0.72 | sp   153s tr   36s
+  it  65 | 11x11 | games  128 pos   7572 | plies  59.2 | P 1.670 V 0.365 top1 0.72 | sp   145s tr   38s
+  it  66 | 11x11 | games  128 pos   7416 | plies  57.9 | P 1.671 V 0.355 top1 0.72 | sp   138s tr   35s
+
+training complete -> runs/az_hex/final.pt

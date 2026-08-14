@@ -1,8 +1,9 @@
 .venv/
 __pycache__/
 *.pyc
-# training artifacts
-runs/
-__pycache__/
-*.pyc
-*.pt
+
+# Training artifacts: keep the reports, logs and the final network; skip the
+# intermediate checkpoints (1.5 MB each) and the raw per-game move dumps.
+runs/**/*.pt
+!runs/az_hex/final.pt
+runs/**/games.json

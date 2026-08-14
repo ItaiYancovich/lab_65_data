@@ -1,0 +1,136 @@
+{
+  "table": [
+    {
+      "agent": "AlphaZero (400 sims)",
+      "wins": 149,
+      "losses": 1,
+      "games": 150,
+      "win_rate": 0.9933333333333333,
+      "elo": 2652.5701280785706,
+      "elo_err": 176.54760942266296,
+      "sec_per_move": 0.4704254522518861
+    },
+    {
+      "agent": "AlphaZero policy only (no search)",
+      "wins": 121,
+      "losses": 29,
+      "games": 150,
+      "win_rate": 0.8066666666666666,
+      "elo": 2136.948104706134,
+      "elo_err": 136.59425428680453,
+      "sec_per_move": 0.0035596655836009016
+    },
+    {
+      "agent": "classic MCTS rollouts (1.0s/move)",
+      "wins": 88,
+      "losses": 62,
+      "games": 150,
+      "win_rate": 0.5866666666666667,
+      "elo": 1526.5355922916767,
+      "elo_err": 96.04731805741427,
+      "sec_per_move": 0.9806604691929147
+    },
+    {
+      "agent": "brute-force alpha-beta (1.0s/move)",
+      "wins": 60,
+      "losses": 90,
+      "games": 150,
+      "win_rate": 0.4,
+      "elo": 1134.4505184438535,
+      "elo_err": 96.21880607971231,
+      "sec_per_move": 0.7894586110045134
+    },
+    {
+      "agent": "rule-based (two-distance+bridges)",
+      "wins": 32,
+      "losses": 118,
+      "games": 150,
+      "win_rate": 0.21333333333333335,
+      "elo": 726.492715525945,
+      "elo_err": 110.44966477720475,
+      "sec_per_move": 0.002910707825354223
+    },
+    {
+      "agent": "random",
+      "wins": 0,
+      "losses": 150,
+      "games": 150,
+      "win_rate": 0.0,
+      "elo": 0.0,
+      "elo_err": 227.31545548400365,
+      "sec_per_move": 8.871963636223823e-05
+    }
+  ],
+  "matrix": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      30,
+      0,
+      1,
+      1,
+      0,
+      0
+    ],
+    [
+      30,
+      29,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      30,
+      29,
+      29,
+      0,
+      0,
+      0
+    ],
+    [
+      30,
+      30,
+      30,
+      30,
+      0,
+      1
+    ],
+    [
+      30,
+      30,
+      30,
+      30,
+      29,
+      0
+    ]
+  ],
+  "labels": [
+    "random",
+    "rule-based (two-distance+bridges)",
+    "brute-force alpha-beta (1.0s/move)",
+    "classic MCTS rollouts (1.0s/move)",
+    "AlphaZero policy only (no search)",
+    "AlphaZero (400 sims)"
+  ],
+  "elo": {
+    "AlphaZero (400 sims)": 2652.5701280785706,
+    "AlphaZero policy only (no search)": 2136.948104706134,
+    "brute-force alpha-beta (1.0s/move)": 1134.4505184438535,
+    "classic MCTS rollouts (1.0s/move)": 1526.5355922916767,
+    "random": 0.0,
+    "rule-based (two-distance+bridges)": 726.492715525945
+  },
+  "black_win_rate": 0.5,
+  "avg_plies": 38.49111111111111,
+  "n_games": 450,
+  "board_size": 11,
+  "games_per_pair": 30,
+  "total_seconds": 1532.23006939888
+}
