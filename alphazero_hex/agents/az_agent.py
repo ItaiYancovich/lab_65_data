@@ -19,27 +19,28 @@ class AlphaZeroAgent(Agent):
         simulations: int = 400,
         c_puct: float = 1.6,
         temperature: float = 0.0,
+        batch_size: int = 16,
         seed: int | None = None,
         name: str | None = None,
     ):
         self.evaluator = evaluator
         self.cfg = MCTSConfig(simulations=simulations, c_puct=c_puct, add_noise=False)
         self.temperature = temperature
+        self.batch_size = batch_size
         self.rng = np.random.default_rng(seed)
         self.name = name or f"alphazero({simulations}sims)"
         self.last_value = 0.0
 
     def select_move(self, board: HexBoard, last_move: int | None = None) -> int:
         search = Search(board.copy(), self.cfg, self.rng)
-        # Batch every leaf the search asks for; on a CPU a batch of one is
-        # wasteful, so drain as many as the tree will hand over per round trip.
-        while True:
-            leaf = search.next_leaf()
-            if leaf is None:
+        # Gather several leaves per network call using virtual loss; a batch of
+        # one leaves most of the CPU idle.
+        while search.sims_done < self.cfg.simulations:
+            states = search.next_leaf_batch(self.batch_size)
+            if not states:
                 break
-            state, node = leaf
-            priors, values = self.evaluator.evaluate([state])
-            search.expand(node, priors[0], float(values[0]))
+            priors, values = self.evaluator.evaluate(states)
+            search.expand_batch(priors, values)
         self.last_value = search.root_value()
         moves, probs = search.policy_target(self.temperature)
         if self.temperature <= 1e-3:

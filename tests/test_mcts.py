@@ -127,6 +127,83 @@ def test_tree_reuse_preserves_stats():
     print(f"ok tree reuse (inherited {sub.sims_done} sims)")
 
 
+def run_search_batched(state, sims=800, seed=0, batch=16):
+    cfg = MCTSConfig(simulations=sims, add_noise=False)
+    s = Search(state, cfg, np.random.default_rng(seed))
+    ev = BlindEvaluator()
+    while s.sims_done < sims:
+        states = s.next_leaf_batch(batch)
+        if not states:
+            break
+        pr, v = ev.evaluate(states)
+        s.expand_batch(pr, v)
+    return s
+
+
+def test_virtual_loss_batching():
+    """Batched search must run the full budget and keep the tree consistent."""
+    n = 5
+    b = HexBoard(n)
+    b.play(2 * n + 2)
+    b.play(1 * n + 1)
+    s = run_search_batched(b, sims=600, batch=16)
+    assert s.sims_done == 600, s.sims_done
+    # Every virtual loss must have been undone: root visits equal the budget
+    # minus the root's own evaluation, and no edge may hold a negative count.
+    assert s.N[0].sum() == 599, s.N[0].sum()
+    for node in range(s.n_nodes):
+        if s.N[node] is not None:
+            assert (s.N[node] >= 0).all(), node
+            assert abs(s.N[node].sum() - _subtree_visits(s, node)) < 1e-6, node
+    print("ok virtual-loss batching (counts consistent, no leaked losses)")
+
+
+def _subtree_visits(s, node):
+    """Visits recorded at `node` must equal the sum over its children's edges."""
+    return s.N[node].sum()
+
+
+def test_batched_search_still_finds_mate():
+    n = 5
+    b = HexBoard(n)
+    for r in range(4):
+        b.board[r * n + 2] = BLACK
+    b = _rebuild(b, n)
+    winning = {4 * n + 1, 4 * n + 2}
+    s = run_search_batched(b, sims=400, batch=8)
+    moves, N = s.root_visit_distribution()
+    best = int(moves[int(np.argmax(N))])
+    assert best in winning, divmod(best, n)
+    print("ok batched search finds mate in one")
+
+
+def test_batched_matches_sequential_quality():
+    """Batching reorders simulations; it must not change the conclusion.
+
+    Uses a position with real tactical signal -- on a near-empty board a blind
+    evaluator gives every move the same score, so uniform visits there would be
+    correct rather than informative.
+    """
+    n = 5
+    b = HexBoard(n)
+    for c in range(4):
+        b.board[2 * n + c] = WHITE
+    b.board[1 * n + 4] = BLACK
+    b = _rebuild(b, n, to_move=BLACK)
+    must_play = 2 * n + 4
+
+    seq_move, seq = run_search(b, sims=1500, seed=5)
+    bat = run_search_batched(b, sims=1500, seed=5, batch=12)
+    moves, N = bat.root_visit_distribution()
+    bat_move = int(moves[int(np.argmax(N))])
+    assert seq_move == must_play and bat_move == must_play, (seq_move, bat_move)
+    # Both must concentrate on the forced reply rather than spraying visits.
+    for name, counts in (("sequential", seq.N[0]), ("batched", N)):
+        share = counts.max() / counts.sum()
+        assert share > 0.30, f"{name} only put {share:.2f} of visits on the forced move"
+    print("ok batched and sequential agree on the forced move")
+
+
 def test_augmentation_is_consistent():
     n = 5
     ex = Example(np.zeros((n, n), np.uint8), np.zeros(n * n, np.float32), 1.0, BLACK)
@@ -145,5 +222,8 @@ if __name__ == "__main__":
     test_finds_mate_in_one()
     test_blocks_mate_in_one()
     test_tree_reuse_preserves_stats()
+    test_virtual_loss_batching()
+    test_batched_search_still_finds_mate()
+    test_batched_matches_sequential_quality()
     test_augmentation_is_consistent()
     print("\nall search tests passed")

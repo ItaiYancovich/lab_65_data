@@ -42,7 +42,7 @@ class Search:
         "root_state", "cfg", "rng", "n_nodes",
         "moves", "P", "N", "W", "child", "term_value",
         "_pending_path", "_pending_state", "_pending_node",
-        "sims_done", "root_noise_applied",
+        "sims_done", "root_noise_applied", "_batch",
     )
 
     def __init__(self, root_state: HexBoard, cfg: MCTSConfig, rng: np.random.Generator):
@@ -61,6 +61,7 @@ class Search:
         self._pending_node: int = -1
         self.sims_done = 0
         self.root_noise_applied = False
+        self._batch: list[tuple[list, int, HexBoard]] = []
         self._new_node()  # node 0 = root, unexpanded
 
     # ----------------------------------------------------------------- nodes
@@ -113,6 +114,73 @@ class Search:
                         self.term_value[nxt] = -1.0
                 node = nxt
         return None
+
+    # --------------------------------------------------- batched traversal
+    def next_leaf_batch(self, max_leaves: int) -> list[HexBoard]:
+        """Collect up to ``max_leaves`` distinct leaves in one go.
+
+        Each collected path carries a *virtual loss*: the edges along it are
+        temporarily credited with a lost simulation, so the next descent is
+        pushed towards a different branch instead of piling onto the same leaf.
+        The loss is undone in :meth:`expand_batch`.  This is what lets a single
+        game batch its network calls -- a batch of one wastes most of a CPU.
+        """
+        self._batch = []
+        pending_nodes: set[int] = set()
+        vl = 1.0
+        while (
+            len(self._batch) < max_leaves
+            and self.sims_done + len(self._batch) < self.cfg.simulations
+        ):
+            state = self.root_state.copy()
+            path: list[tuple[int, int]] = []
+            node = 0
+            hit_terminal = False
+            while True:
+                if self.term_value[node] is not None:
+                    self._undo_virtual_loss(path, vl)
+                    self._backup(path, self.term_value[node])
+                    self.sims_done += 1
+                    hit_terminal = True
+                    break
+                if not self.is_expanded(node):
+                    break
+                a = self._select(node)
+                move = int(self.moves[node][a])
+                path.append((node, a))
+                self.N[node][a] += vl
+                self.W[node][a] -= vl
+                state.play(move)
+                nxt = int(self.child[node][a])
+                if nxt < 0:
+                    nxt = self._new_node()
+                    self.child[node][a] = nxt
+                    if state.is_terminal():
+                        self.term_value[nxt] = -1.0
+                node = nxt
+            if hit_terminal:
+                continue
+            if node in pending_nodes:
+                # Same leaf twice: stop here and evaluate what we have.
+                self._undo_virtual_loss(path, vl)
+                break
+            pending_nodes.add(node)
+            self._batch.append((path, node, state))
+        return [b[2] for b in self._batch]
+
+    def expand_batch(self, priors: np.ndarray, values: np.ndarray) -> None:
+        for i, (path, node, state) in enumerate(self._batch):
+            self._undo_virtual_loss(path, 1.0)
+            self._pending_path = path
+            self._pending_state = state
+            self._pending_node = node
+            self.expand(node, priors[i], float(values[i]))
+        self._batch = []
+
+    def _undo_virtual_loss(self, path, vl: float) -> None:
+        for node, a in path:
+            self.N[node][a] -= vl
+            self.W[node][a] += vl
 
     def _select(self, node: int) -> int:
         N = self.N[node]
