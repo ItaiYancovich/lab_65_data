@@ -10,7 +10,9 @@ import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from alphazero_hex.arena import fit_elo, balanced_openings, play_match  # noqa: E402
+from alphazero_hex.arena import (  # noqa: E402
+    fit_elo, balanced_openings, play_match, elo_standard_errors,
+)
 from alphazero_hex.agents.base import RandomAgent  # noqa: E402
 from alphazero_hex.agents.rule_based import RuleBasedAgent  # noqa: E402
 
@@ -44,6 +46,21 @@ def test_elo_handles_perfect_scores():
     print("ok elo finite under a perfect score:", {k: round(v) for k, v in elo.items()})
 
 
+def test_elo_errors_are_finite_and_shrink_with_games():
+    """Error bars must stay finite on a sweep and tighten with more games."""
+    sweep = [("weak", "strong", 0, 40), ("weak", "mid", 5, 35), ("mid", "strong", 8, 32)]
+    elo = fit_elo(sweep, anchor="weak", anchor_rating=0.0)
+    se = elo_standard_errors(sweep, elo)
+    assert all(math.isfinite(v) and v > 0 for v in se.values()), se
+
+    few = [("a", "b", 6, 4)]
+    many = [("a", "b", 600, 400)]
+    se_few = elo_standard_errors(few, fit_elo(few))
+    se_many = elo_standard_errors(many, fit_elo(many))
+    assert se_many["a"] < se_few["a"] / 5, (se_few, se_many)
+    print("ok elo standard errors:", {k: round(v) for k, v in se.items()})
+
+
 def test_openings_are_distinct_and_legal():
     ops = balanced_openings(11, 10, np.random.default_rng(1))
     assert len(ops) == 10 and len(set(ops)) == 10
@@ -66,6 +83,7 @@ def test_match_is_colour_balanced():
 if __name__ == "__main__":
     test_elo_recovers_known_ratings()
     test_elo_handles_perfect_scores()
+    test_elo_errors_are_finite_and_shrink_with_games()
     test_openings_are_distinct_and_legal()
     test_match_is_colour_balanced()
     print("\nall arena tests passed")

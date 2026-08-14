@@ -26,6 +26,10 @@ class GameRecord:
     opening: int | None
     moves: list[int] = field(default_factory=list)
     seconds: float = 0.0
+    black_seconds: float = 0.0
+    white_seconds: float = 0.0
+    black_moves: int = 0
+    white_moves: int = 0
 
 
 def play_game(
@@ -48,9 +52,15 @@ def play_game(
         moves.append(opening)
         last = opening
     limit = max_plies or board.ncells
+    clock = {BLACK: 0.0, WHITE: 0.0}
+    counts = {BLACK: 0, WHITE: 0}
     while not board.is_terminal() and board.move_count < limit:
-        agent = black if board.to_move == BLACK else white
+        side = board.to_move
+        agent = black if side == BLACK else white
+        tm = time.time()
         move = agent.select_move(board, last)
+        clock[side] += time.time() - tm
+        counts[side] += 1
         if not board.is_legal(move):
             raise ValueError(f"{agent.name} played illegal move {move}")
         board.play(move)
@@ -65,6 +75,10 @@ def play_game(
         opening=opening,
         moves=moves if record_moves else [],
         seconds=time.time() - t0,
+        black_seconds=clock[BLACK],
+        white_seconds=clock[WHITE],
+        black_moves=counts[BLACK],
+        white_moves=counts[WHITE],
     )
 
 
@@ -191,14 +205,39 @@ def fit_elo(
     return elo
 
 
-def elo_confidence(win_rate: float, games: int) -> float:
-    """Rough +/- 1 sigma Elo uncertainty for a win rate over ``games`` games."""
-    if games == 0:
-        return float("inf")
-    p = min(max(win_rate, 1e-6), 1 - 1e-6)
-    se = math.sqrt(p * (1 - p) / games)
-    # d(Elo)/dp at p, on the logistic scale
-    return 400.0 / math.log(10.0) * se / (p * (1 - p))
+def elo_standard_errors(
+    results: list[tuple[str, str, int, int]], elo: dict[str, float]
+) -> dict[str, float]:
+    """+/- 1 sigma on each rating, from the Bradley-Terry Fisher information.
+
+    A per-player binomial error bar is wrong here (and diverges on a clean
+    sweep).  The likelihood's information matrix uses who each player actually
+    faced, so beating a strong opponent tightens the estimate more than
+    beating a weak one.  The matrix is singular by one dimension -- ratings are
+    only defined up to a shift -- so the pseudo-inverse gives errors relative
+    to the field mean.
+    """
+    players = sorted({p for r in results for p in (r[0], r[1])})
+    index = {p: i for i, p in enumerate(players)}
+    k = len(players)
+    scale = 400.0 / math.log(10.0)
+    r = np.array([elo[p] / scale for p in players])
+
+    info = np.zeros((k, k))
+    for a, b, aw, bw in results:
+        n = aw + bw
+        if n == 0:
+            continue
+        ia, ib = index[a], index[b]
+        p = 1.0 / (1.0 + np.exp(r[ib] - r[ia]))
+        w = n * p * (1 - p)
+        info[ia, ia] += w
+        info[ib, ib] += w
+        info[ia, ib] -= w
+        info[ib, ia] -= w
+    cov = np.linalg.pinv(info)
+    se = np.sqrt(np.clip(np.diag(cov), 0.0, None)) * scale
+    return {p: float(se[index[p]]) for p in players}
 
 
 def round_robin(
