@@ -64,6 +64,7 @@ class TrainConfig:
     value_loss_weight: float = 1.0
     workers: int = 4
     seed: int = 0
+    init_from: str | None = None  # checkpoint to continue training from
     eval_every: int = 6
     eval_games: int = 10
     eval_simulations: int = 96
@@ -121,11 +122,24 @@ class Trainer:
         torch.manual_seed(cfg.seed)
         self.rng = np.random.default_rng(cfg.seed)
         self.net = HexNet(cfg.net)
+        if cfg.init_from:
+            blob = torch.load(cfg.init_from, map_location="cpu", weights_only=False)
+            if blob["cfg"] != cfg.net.to_dict():
+                raise ValueError(
+                    f"checkpoint architecture {blob['cfg']} does not match "
+                    f"configured {cfg.net.to_dict()}"
+                )
+            self.net.load_state_dict(blob["state_dict"])
+            self.iteration_offset = int(blob.get("extra", {}).get("iteration", 0))
+            print(f"continuing from {cfg.init_from} "
+                  f"(iteration {self.iteration_offset})", flush=True)
+        else:
+            self.iteration_offset = 0
         self.opt = torch.optim.AdamW(
             self.net.parameters(), lr=2e-3, weight_decay=cfg.weight_decay
         )
         self.buffer: deque[Example] = deque(maxlen=cfg.buffer_positions)
-        self.iteration = 0
+        self.iteration = self.iteration_offset
         self.log_path = self.run_dir / "log.jsonl"
         self.pool = None
         if cfg.workers > 1:

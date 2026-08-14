@@ -31,6 +31,9 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run-dir", default="runs/az_hex")
     ap.add_argument("--preset", choices=["full", "quick", "board11-only"], default="full")
+    ap.add_argument("--init-from", default=None,
+                    help="checkpoint to continue training from (must match --channels/--blocks)")
+    ap.add_argument("--lr", type=float, default=None, help="override every stage's learning rate")
     ap.add_argument("--channels", type=int, default=64)
     ap.add_argument("--blocks", type=int, default=5)
     ap.add_argument("--workers", type=int, default=4)
@@ -50,12 +53,17 @@ def main() -> None:
         if args.iters_11 is not None:
             stages[-1].iterations = args.iters_11
 
+    if args.lr is not None:
+        for s in stages:
+            s.lr = args.lr
+
     cfg = TrainConfig(
         run_dir=args.run_dir,
         net=NetConfig(channels=args.channels, blocks=args.blocks),
         stages=stages,
         workers=args.workers,
         seed=args.seed,
+        init_from=args.init_from,
         eval_every=args.eval_every,
     )
     trainer = Trainer(cfg)
