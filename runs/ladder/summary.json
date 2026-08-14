@@ -1,0 +1,136 @@
+{
+  "table": [
+    {
+      "agent": "AlphaZero final (11x11, 30 iters)",
+      "wins": 72,
+      "losses": 8,
+      "games": 80,
+      "win_rate": 0.9,
+      "elo": 2547.96085750733,
+      "elo_err": 106.4426472997779,
+      "sec_per_move": 0.6116373686323188
+    },
+    {
+      "agent": "AlphaZero after 11x11 (20 iters)",
+      "wins": 68,
+      "losses": 12,
+      "games": 80,
+      "win_rate": 0.85,
+      "elo": 2478.4341015915966,
+      "elo_err": 103.25885604654336,
+      "sec_per_move": 0.630526490542332
+    },
+    {
+      "agent": "AlphaZero after 9x9 stage",
+      "wins": 50,
+      "losses": 30,
+      "games": 80,
+      "win_rate": 0.625,
+      "elo": 2172.725529676907,
+      "elo_err": 94.29734646004698,
+      "sec_per_move": 0.6272416391234467
+    },
+    {
+      "agent": "AlphaZero after 7x7 stage",
+      "wins": 34,
+      "losses": 46,
+      "games": 80,
+      "win_rate": 0.425,
+      "elo": 1850.038966912063,
+      "elo_err": 94.38838526598092,
+      "sec_per_move": 0.6170111794847813
+    },
+    {
+      "agent": "AlphaZero after 5x5 stage",
+      "wins": 16,
+      "losses": 64,
+      "games": 80,
+      "win_rate": 0.2,
+      "elo": 1334.3425294804665,
+      "elo_err": 135.87894759791504,
+      "sec_per_move": 0.6543141549644781
+    },
+    {
+      "agent": "rule-based (two-distance+bridges)",
+      "wins": 0,
+      "losses": 80,
+      "games": 80,
+      "win_rate": 0.0,
+      "elo": 726.492715525945,
+      "elo_err": 239.4941940164272,
+      "sec_per_move": 0.001977284204481164
+    }
+  ],
+  "matrix": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      16,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      16,
+      16,
+      0,
+      1,
+      1,
+      0
+    ],
+    [
+      16,
+      16,
+      15,
+      0,
+      2,
+      1
+    ],
+    [
+      16,
+      16,
+      15,
+      14,
+      0,
+      7
+    ],
+    [
+      16,
+      16,
+      16,
+      15,
+      9,
+      0
+    ]
+  ],
+  "labels": [
+    "rule-based (two-distance+bridges)",
+    "AlphaZero after 5x5 stage",
+    "AlphaZero after 7x7 stage",
+    "AlphaZero after 9x9 stage",
+    "AlphaZero after 11x11 (20 iters)",
+    "AlphaZero final (11x11, 30 iters)"
+  ],
+  "elo": {
+    "AlphaZero after 11x11 (20 iters)": 2478.4341015915966,
+    "AlphaZero after 5x5 stage": 1334.3425294804665,
+    "AlphaZero after 7x7 stage": 1850.038966912063,
+    "AlphaZero after 9x9 stage": 2172.725529676907,
+    "AlphaZero final (11x11, 30 iters)": 2547.96085750733,
+    "rule-based (two-distance+bridges)": 726.492715525945
+  },
+  "black_win_rate": 0.5416666666666666,
+  "avg_plies": 40.041666666666664,
+  "n_games": 240,
+  "board_size": 11,
+  "games_per_pair": 16,
+  "total_seconds": 1333.352723121643
+}

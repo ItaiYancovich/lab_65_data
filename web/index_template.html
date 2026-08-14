@@ -1,0 +1,141 @@
+<title>Hex Lab</title>
+<style>
+__CSS__
+</style>
+
+<div class="app">
+  <header class="masthead">
+    <div>
+      <h1 class="wordmark">Hex <em>Lab</em></h1>
+      <p class="tagline">Play against six generations of Hex-playing algorithms &mdash; from a
+        random mover up to an AlphaZero-style network trained by self-play, all running
+        live in this page.</p>
+    </div>
+    <div class="theme-toggle" role="group" aria-label="Theme">
+      <button type="button" data-mode="light">Light</button>
+      <button type="button" data-mode="system" aria-pressed="true">Auto</button>
+      <button type="button" data-mode="dark">Dark</button>
+    </div>
+  </header>
+
+  <main class="console">
+    <section class="board-pane" aria-label="Board">
+      <div class="board-frame">
+        <svg id="board-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+
+      <div class="status-strip">
+        <div class="status-line">
+          <span id="status-dot" class="status-dot"></span>
+          <span id="status-text" class="status-text">Loading&hellip;</span>
+        </div>
+        <div id="status-sub" class="status-sub"></div>
+        <div id="eval-row" class="eval-bar-row" style="display:none">
+          <span class="eval-label">Black</span>
+          <div class="eval-bar"><div id="eval-fill" class="eval-fill"></div></div>
+          <span class="eval-label">White</span>
+        </div>
+        <div id="eval-caption" class="status-sub"></div>
+        <div id="banner" class="banner">
+          <span id="banner-text"></span>
+          <button id="banner-newgame" type="button">New game</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="card">
+        <h2><span class="eyebrow">Match setup</span>Seats</h2>
+
+        <div class="seat seat-black">
+          <div class="seat-head"><span><span class="seat-stone black"></span>Black &middot; top &harr; bottom</span></div>
+          <select id="seat-black-kind">
+            <option value="human">Human (you)</option>
+            <option value="random">Random</option>
+            <option value="rule">Rule-based (two-distance + bridges)</option>
+            <option value="minimax">Brute-force alpha-beta</option>
+            <option value="rollout">Classic MCTS rollouts</option>
+            <option value="policy">AlphaZero &mdash; policy only</option>
+            <option value="az">AlphaZero &mdash; with search</option>
+          </select>
+          <div id="seat-black-strength-row" class="strength-row" style="display:none">
+            <span>strength</span>
+            <input id="seat-black-strength" type="range" />
+            <span id="seat-black-strength-val" class="val"></span>
+          </div>
+        </div>
+
+        <div class="seat seat-white">
+          <div class="seat-head"><span><span class="seat-stone white"></span>White &middot; left &harr; right</span></div>
+          <select id="seat-white-kind">
+            <option value="human">Human (you)</option>
+            <option value="random">Random</option>
+            <option value="rule">Rule-based (two-distance + bridges)</option>
+            <option value="minimax">Brute-force alpha-beta</option>
+            <option value="rollout">Classic MCTS rollouts</option>
+            <option value="policy">AlphaZero &mdash; policy only</option>
+            <option value="az" selected>AlphaZero &mdash; with search</option>
+          </select>
+          <div id="seat-white-strength-row" class="strength-row" style="display:none">
+            <span>strength</span>
+            <input id="seat-white-strength" type="range" />
+            <span id="seat-white-strength-val" class="val"></span>
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top:12px">
+          <button id="new-game" type="button" class="primary">New game</button>
+          <button id="swap-seats" type="button">Swap seats</button>
+          <button id="undo" type="button">Undo</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="eyebrow">Ledger</span>Moves</h2>
+        <div id="movelog" class="movelog"><div class="empty">No moves yet.</div></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="eyebrow">From the tournament</span>Standings, 11&times;11</h2>
+        <div style="overflow-x:auto">
+          <table class="standings-table">
+            <thead><tr><th>#</th><th>Agent</th><th>Elo</th><th>Win %</th></tr></thead>
+            <tbody id="standings-body"></tbody>
+          </table>
+        </div>
+        <p class="standings-note">450 games, colours balanced. Each rung plays every classical
+          agent below it convincingly &mdash; even AlphaZero's policy head alone, with no search
+          at all, beats them all.</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="note">
+    Every agent here runs client-side in your browser &mdash; the AlphaZero network was trained
+    by self-play (5&times;5 &rarr; 7&times;7 &rarr; 9&times;9 &rarr; 11&times;11) on four CPU cores, no GPU.
+  </footer>
+</div>
+
+<script>
+// ---- hex.js ----
+__HEX_JS__
+</script>
+<script>
+// ---- heuristics.js ----
+__HEURISTICS_JS__
+</script>
+<script>
+// ---- net.js ----
+__NET_JS__
+</script>
+<script>
+window.NET_JSON = __NET_JSON__;
+</script>
+<script>
+// ---- agents.js ----
+__AGENTS_JS__
+</script>
+<script>
+// ---- app.js ----
+__APP_JS__
+</script>
