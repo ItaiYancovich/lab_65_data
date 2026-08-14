@@ -57,11 +57,13 @@ def main() -> None:
         # Rate each curriculum checkpoint at identical search, so the Elo gaps
         # measure what training added rather than what search added.
         ckpt_dir = Path(args.ckpt).parent
-        for size in (5, 7, 9):
-            p = ckpt_dir / f"stage_{size}.pt"
-            if p.exists():
-                field.append(spec("az", f"AlphaZero after {size}x{size} stage ({args.az_sims} sims)",
-                                  ckpt=str(p), simulations=args.az_sims))
+        final = Path(args.ckpt).resolve()
+        for p in sorted(ckpt_dir.glob("stage_*.pt")):
+            if p.resolve() == final:
+                continue
+            label = p.stem.replace("stage_", "").replace("_", " ")
+            field.append(spec("az", f"AlphaZero @ {label} ({args.az_sims} sims)",
+                              ckpt=str(p), simulations=args.az_sims))
 
     summary = run_tournament(
         field,
