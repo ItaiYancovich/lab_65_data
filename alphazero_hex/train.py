@@ -133,8 +133,15 @@ class Trainer:
             self.iteration_offset = int(blob.get("extra", {}).get("iteration", 0))
             print(f"continuing from {cfg.init_from} "
                   f"(iteration {self.iteration_offset})", flush=True)
+            frozen = HexNet(cfg.net)
+            frozen.load_state_dict(blob["state_dict"])
+            frozen.eval()
+            self._baseline_eval = BatchEvaluator(
+                frozen, board_size=cfg.stages[0].board_size if cfg.stages else 11
+            )
         else:
             self.iteration_offset = 0
+            self._baseline_eval = None
         self.opt = torch.optim.AdamW(
             self.net.parameters(), lr=2e-3, weight_decay=cfg.weight_decay
         )
@@ -251,11 +258,20 @@ class Trainer:
         torch.set_num_threads(os.cpu_count() or 4)
         ev = BatchEvaluator(self.net, board_size=stage.board_size)
         az = AlphaZeroAgent(ev, simulations=self.cfg.eval_simulations, seed=int(self.rng.integers(1 << 30)))
-        out = {}
-        for name, opp in (
+        opponents = [
             ("vs_random", RandomAgent(seed=int(self.rng.integers(1 << 30)))),
             ("vs_rule_based", RuleBasedAgent(seed=int(self.rng.integers(1 << 30)), noise=0.05)),
-        ):
+        ]
+        if self._baseline_eval is not None:
+            # Once the hand-written agents are swept, they stop being an
+            # informative signal; the checkpoint we started from does not.
+            opponents.append((
+                "vs_start_checkpoint",
+                AlphaZeroAgent(self._baseline_eval, simulations=self.cfg.eval_simulations,
+                               seed=int(self.rng.integers(1 << 30)), name="start-checkpoint"),
+            ))
+        out = {}
+        for name, opp in opponents:
             res = play_match(az, opp, stage.board_size, self.cfg.eval_games,
                              rng=np.random.default_rng(int(self.rng.integers(1 << 30))))
             out[name] = res["a_win_rate"]
@@ -300,6 +316,8 @@ class Trainer:
                        f"| sp {t1 - t0:5.0f}s tr {t2 - t1:4.0f}s")
                 if "vs_rule_based" in record:
                     msg += f" | vs rand {record['vs_random']:.2f} vs rules {record['vs_rule_based']:.2f}"
+                    if "vs_start_checkpoint" in record:
+                        msg += f" vs start {record['vs_start_checkpoint']:.2f}"
                 print(msg, flush=True)
                 save_checkpoint(self.run_dir / "latest.pt", self.net,
                                 {"iteration": self.iteration, "stage": stage.board_size})

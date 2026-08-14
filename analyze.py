@@ -28,7 +28,8 @@ def summarise(records: list[dict]) -> dict:
         "policy_top1": [], "avg_plies": [], "games": [], "selfplay_sec": [],
         "train_sec": [], "positions": [],
     }
-    evals = {"iteration": [], "stage": [], "vs_random": [], "vs_rule_based": []}
+    evals = {"iteration": [], "stage": [], "vs_random": [], "vs_rule_based": [],
+             "vs_start_checkpoint": []}
     for r in records:
         curves["iteration"].append(r["iteration"])
         curves["stage"].append(r["stage"])
@@ -45,6 +46,7 @@ def summarise(records: list[dict]) -> dict:
             evals["stage"].append(r["stage"])
             evals["vs_random"].append(r["vs_random"])
             evals["vs_rule_based"].append(r["vs_rule_based"])
+            evals["vs_start_checkpoint"].append(r.get("vs_start_checkpoint"))
 
     stages = {}
     for i, s in enumerate(curves["stage"]):
