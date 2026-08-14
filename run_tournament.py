@@ -28,6 +28,8 @@ def main() -> None:
     ap.add_argument("--include-random", action="store_true", default=True)
     ap.add_argument("--scaling", action="store_true",
                     help="also enter AlphaZero at several simulation counts")
+    ap.add_argument("--ladder", action="store_true",
+                    help="enter each curriculum checkpoint, to rate training progress")
     args = ap.parse_args()
 
     field = default_field(args.ckpt)
@@ -48,6 +50,15 @@ def main() -> None:
             spec("az", "AlphaZero (100 sims)", ckpt=args.ckpt, simulations=100),
             spec("az", "AlphaZero (800 sims)", ckpt=args.ckpt, simulations=800),
         ]
+    if args.ladder:
+        # Rate each curriculum checkpoint at identical search, so the Elo gaps
+        # measure what training added rather than what search added.
+        ckpt_dir = Path(args.ckpt).parent
+        for size in (5, 7, 9):
+            p = ckpt_dir / f"stage_{size}.pt"
+            if p.exists():
+                field.append(spec("az", f"AlphaZero after {size}x{size} stage ({args.az_sims} sims)",
+                                  ckpt=str(p), simulations=args.az_sims))
 
     summary = run_tournament(
         field,
