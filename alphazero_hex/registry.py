@@ -78,7 +78,8 @@ def default_field(ckpt: str) -> list[AgentSpec]:
         spec("random", "random"),
         spec("rule", "rule-based (two-distance+bridges)", noise=0.05),
         spec("minimax", "brute-force alpha-beta (1.0s/move)", time_budget=1.0, beam=8),
-        spec("rollout", "classic MCTS rollouts (3000)", simulations=3000),
+        spec("rollout", "classic MCTS rollouts (1.0s/move)",
+             simulations=200_000, time_budget=1.0),
         spec("policy", "AlphaZero policy only (no search)", ckpt=ckpt),
         spec("az", "AlphaZero (400 sims)", ckpt=ckpt, simulations=400),
     ]
